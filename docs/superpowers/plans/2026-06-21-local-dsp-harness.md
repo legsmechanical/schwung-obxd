@@ -394,6 +394,20 @@ Claude-Session: https://claude.ai/code/session_017fZojSLfPB7Cpn4SLDh5Xh"
 
 ### Task 4: Golden-reference test `test_golden.cpp` + baseline
 
+> **OUTCOME 2026-06-21: DEFERRED (behavioral-only ships).** The determinism gate
+> correctly failed: OB-Xd has unconditional per-sample RNG noise seeded from
+> `Random::getSystemRandom()`/`time()` — filter-cutoff noise (`Engine/ObxdVoice.h:203`,
+> seeded `:135`) and oscillator pitch "dirt" hardcoded to 0.1 (`Engine/ObxdOscillatorB.h:165,208`,
+> seeded `:104`). No exposed param disables it; two instances diverge by max 4111
+> over 32660/32768 samples. `getSystemRandom()` is also a process-global static, so
+> a fixed seed alone wouldn't make instances match without per-instance reset.
+> Golden requires a fixed-seed hook in `src/dsp/` (out of scope; invasive engine
+> change on a public repo) — so `test_golden.cpp` and the baseline were NOT
+> committed. obxd golden stays deferred; behavioral coverage (`test_smoke`) ships.
+> Whole-plan verification target is therefore **1 passed (test_smoke)**, not 2.
+
+
+
 **Files:**
 - Create: `tests/test_golden.cpp`
 - Create: `tests/baseline/obxd_c4.s16` (generated)
