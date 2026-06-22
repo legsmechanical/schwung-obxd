@@ -326,6 +326,7 @@ typedef struct {
     BankInfo banks[MAX_BANKS];
     int bank_count;
     int current_bank;
+    int editor_bank;  /* active bank index for the canvas Bank Editor (persists per instance) */
 } obxd_instance_t;
 
 /* Forward declarations */
@@ -786,6 +787,7 @@ static void* v2_create_instance(const char *module_dir, const char *json_default
     v2_scan_banks(inst, module_dir);
     if (inst->bank_count > 0) {
         inst->current_bank = -1;  /* Force load */
+        inst->editor_bank = 0;
         v2_switch_bank(inst, 0);
     }
 
@@ -1108,6 +1110,12 @@ static void v2_set_param(void *instance, const char *key, const char *val) {
             v2_apply_param(inst, inst->param_bank, idx, fval);
         }
     }
+    else if (strcmp(key, "editor") == 0) {
+        int n = atoi(val);
+        if (n < 0) n = 0;
+        if (n > 63) n = 63;       /* generous upper clamp; canvas owns real bound */
+        inst->editor_bank = n;
+    }
     else {
         /* Named parameter access (shadow UI / remote UI) — value is a native int */
         for (int i = 0; i < (int)PARAM_DEF_COUNT(g_shadow_params); i++) {
@@ -1140,6 +1148,9 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
     }
     if (strcmp(key, "bank_index") == 0) {
         return snprintf(buf, buf_len, "%d", inst->current_bank);
+    }
+    if (strcmp(key, "editor") == 0) {
+        return snprintf(buf, buf_len, "%d", inst->editor_bank);
     }
     if (strcmp(key, "bank_count") == 0) {
         return snprintf(buf, buf_len, "%d", inst->bank_count);
@@ -1209,6 +1220,7 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
                     "\"children\":null,"
                     "\"knobs\":[\"cutoff\",\"resonance\",\"filter_env\",\"attack\",\"decay\",\"sustain\",\"release\",\"octave_transpose\"],"
                     "\"params\":["
+                        "{\"key\":\"editor\",\"label\":\"Bank Editor\"},"
                         "{\"level\":\"banks\",\"label\":\"Banks\"},"
                         "{\"level\":\"global\",\"label\":\"Global\"},"
                         "{\"level\":\"osc1\",\"label\":\"Oscillator 1\"},"
@@ -1326,7 +1338,9 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
         int offset = 0;
         offset += snprintf(buf + offset, buf_len - offset,
             "[{\"key\":\"preset\",\"name\":\"Preset\",\"type\":\"int\",\"min\":0,\"max\":9999},"
-            "{\"key\":\"octave_transpose\",\"name\":\"Octave\",\"type\":\"int\",\"min\":-3,\"max\":3}");
+            "{\"key\":\"octave_transpose\",\"name\":\"Octave\",\"type\":\"int\",\"min\":-3,\"max\":3},"
+            "{\"key\":\"editor\",\"name\":\"Bank Editor\",\"type\":\"canvas\","
+            "\"canvas_script\":\"canvas.js#bank_editor\",\"show_footer\":false,\"show_value\":false}");
 
         /* Add all shadow params — native int ranges (type int, step 1) */
         for (int i = 0; i < (int)PARAM_DEF_COUNT(g_shadow_params) && offset < buf_len - 100; i++) {
