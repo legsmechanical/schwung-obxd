@@ -85,16 +85,6 @@ var COL_X0 = 4, ROW_Y0 = HDR_H + 2;
 function cellX(k) { return COL_X0 + (k % 4) * CELL_W; }
 function cellY(k) { return k < 4 ? ROW_Y0 : ROW_Y0 + CELL_H + 3; }
 
-/* draw the right-aligned bank-position strip; active bank = tall block */
-function drawBankStrip(ctx, active, count) {
-  var pitch = 4, w = 3;
-  var x = ctx.width - 4 - (count - 1) * pitch; // left edge so the strip is right-aligned
-  for (var i = 0; i < count; i++) {
-    var bx = x + i * pitch;
-    if (i === active) ctx.fillRect(bx, 0, w, 7, 1);
-    else ctx.fillRect(bx, 4, w, 2, 1);
-  }
-}
 
 function readState(ctx) {
   var s = ctx.state;
@@ -155,22 +145,26 @@ globalThis.bank_editor = {
     var s = readState(ctx);
     var bank = BANKS[s.bank];
 
-    // header: bank label (left) + position strip (right)
+    // header: bank label (left) + "N/M" position counter (right)
     ctx.print(2, 1, bank.label.slice(0, 16), 1);
-    drawBankStrip(ctx, s.bank, BANKS.length);
+    var pos = (s.bank + 1) + "/" + BANKS.length;
+    ctx.print(ctx.width - pos.length * 6 - 1, 1, pos, 1);
 
-    // 8 cells
+    // 8 cells in a fixed 2x4 grid; every cell outlined so the grid is obvious,
+    // empty cells (banks with <8 params) read as empty boxes, touched cell inverts.
     for (var k = 0; k < 8; k++) {
       var pm = bank.knobs[k];
       var x = cellX(k), y = cellY(k);
+      var w = CELL_W - 2, h = CELL_H;
       var hi = (k === s.lastKnob) && pm;
-      if (hi) ctx.fillRect(x, y, CELL_W - 2, CELL_H, 1);
-      if (!pm) continue;
+      if (hi) ctx.fillRect(x, y, w, h, 1);
+      else ctx.drawRect(x, y, w, h, 1);
+      if (!pm) continue;                 // empty cell: outline only
       var fg = hi ? 0 : 1;
-      ctx.print(x + 1, y + 1, pm.abbrev, fg);
+      ctx.print(x + 2, y + 2, pm.abbrev, fg);
       var raw = ctx.getParam(pm.key);
       var txt = (raw === null || raw === undefined || raw === "") ? "-" : String(raw);
-      ctx.print(x + 1, y + 12, txt, fg);
+      ctx.print(x + 2, y + 13, txt, fg);
     }
   },
 
