@@ -58,7 +58,6 @@ Registers `globalThis.bank_editor` implementing the canvas hooks (`onOpen`, `tic
     davebox (`d2` 1–63 = CW, 64–127 = CCW), accumulate per-knob until `>= sens`, then
     `newVal = clamp(cur + dir*step, min, max)` and `ctx.setParam(key, newVal)`. Track
     last-touched knob index for highlight.
-  - **(Bonus) Shift + top-row pad** → direct bank jump, if cheap to add. Secondary to jog.
   - Back (CC 51) and jog-click (CC 3) are **stolen by the host** to close the canvas — not
     available to us.
 - **`draw(ctx)`**:
@@ -99,28 +98,38 @@ Add `cp src/canvas.js dist/obxd/` alongside the existing `web_ui.html` copy, so 
 deploys to `/data/UserData/schwung/modules/sound_generators/obxd/canvas.js` — the module dir,
 where `canvas_script:"canvas.js#…"` resolves.
 
-## Bank layout (8 banks × ≤8 params)
+## Bank layout — every param exposed
 
-OB-Xd params are all native-int at the boundary (continuous → 0..100, toggles → 0..1, etc.),
-so value formatting is trivial. Order (amp envelope ahead of filter, per request):
+**All synth params are reachable.** Banks follow the synth's natural categories; a category
+with more than 8 params splits across consecutively-numbered banks using a `Category (n/N)`
+label convention (e.g. `Filter (1/2)`). A category with fewer than 8 params is its own bank
+and leaves trailing cells empty (their encoders inert). OB-Xd params are native-int at the
+boundary (continuous → 0..100, toggles → 0..1, etc.), so value formatting is trivial. Order
+puts amp envelope ahead of filter, per request:
 
-- **A — Osc1+2:** `osc1_saw`, `osc1_pulse`, `osc1_pitch`, `osc1_mix`, `osc2_saw`,
-  `osc2_pulse`, `osc2_pitch`, `osc2_mix`
-- **B — Osc Mods:** `pw`, `pw_env`, `pw_env_both`, `noise`, `xmod`, `brightness`,
-  `osc2_detune`, `osc2_sync`
-- **C — Amp Env + Vol:** `attack`, `decay`, `sustain`, `release`, `vel_amp`, `volume`
-- **D — Filter:** `cutoff`, `resonance`, `filter_env`, `key_follow`, `multimode`, `fourpole`,
-  `fenv_inv`, `self_osc`
-- **E — Filter Env:** `f_attack`, `f_decay`, `f_sustain`, `f_release`, `vel_filter`
-- **F — LFO:** `lfo_rate`, `lfo_amt1`, `lfo_amt2`, `lfo_sin`, `lfo_square`, `lfo_sh`,
-  `lfo_sync`, `lfo_filter`
-- **G — Voice/Unison:** `voice_count`, `unison`, `unison_det`, `legato`, `octave`,
-  `portamento`, `as_played`, `env_pitch`
-- **H — Variation/Pan:** `filter_var`, `env_var`, `level_var`, `pan_1`, `pan_2`, `pan_3`,
-  `pan_4`
+1. **Osc 1:** `osc1_saw`, `osc1_pulse`, `osc1_pitch`, `osc1_mix`
+2. **Osc 2:** `osc2_saw`, `osc2_pulse`, `osc2_pitch`, `osc2_mix`, `osc2_detune`, `osc2_sync`,
+   `osc_quantize`
+3. **Osc Common:** `pw`, `pw_env`, `pw_env_both`, `pw_ofs`, `noise`, `xmod`, `brightness`
+4. **Amp Env:** `attack`, `decay`, `sustain`, `release`, `vel_amp`
+5. **Filter (1/2):** `cutoff`, `resonance`, `filter_env`, `key_follow`, `multimode`
+6. **Filter (2/2):** `bandpass`, `fourpole`, `self_osc`, `fenv_inv`
+7. **Filter Env:** `f_attack`, `f_decay`, `f_sustain`, `f_release`, `vel_filter`
+8. **LFO:** `lfo_rate`, `lfo_amt1`, `lfo_amt2`, `lfo_sin`, `lfo_square`, `lfo_sh`, `lfo_sync`
+9. **LFO Dest:** `lfo_osc1`, `lfo_osc2`, `lfo_filter`, `lfo_pw1`, `lfo_pw2`
+10. **Pitch Mod:** `env_pitch`, `env_pitch_both`, `bend_range`, `bend_osc2`, `vibrato`
+11. **Global (1/2):** `volume`, `tune`, `octave`, `octave_transpose`, `portamento`
+12. **Global (2/2):** `voice_count`, `legato`, `unison`, `unison_det`, `as_played`
+13. **Voice Var (1/2):** `filter_var`, `porta_var`, `env_var`, `level_var`
+14. **Voice Var (2/2):** `pan_1`, `pan_2`, `pan_3`, `pan_4`, `pan_5`, `pan_6`, `pan_7`, `pan_8`
 
-Banks with fewer than 8 params leave the trailing cells empty (and their encoders inert).
-The layout lives entirely in `canvas.js` and is freely tunable without a DSP rebuild.
+This covers every entry in `g_shadow_params[]` plus the plugin-level `octave_transpose`
+(`preset`/`bank_index` are not knob params and are excluded). Implementation must enumerate
+against `g_shadow_params[]` to confirm no param is missed — the count is the check. The whole
+layout lives in `canvas.js`'s `BANKS` table and is freely tunable without a DSP rebuild.
+
+With ~14 banks, **jog-turn cycling is the only bank nav in v1** (no pad jump — see Out of
+scope). Cycling wraps or clamps across all banks.
 
 ## Data flow
 
@@ -157,6 +166,7 @@ This is almost entirely JS/UX, so the real verification is on-device:
 
 ## Out of scope (possible later)
 
+- **Shift + top-row pad direct bank jump** (deferred from v1; jog-only for now).
 - Generalizing the Bank Editor into a shared, reusable toolkit across modules.
 - Per-bank alt-layers, pad-driven A/B compare, modulation visualization.
 - LED indication (would require host changes / overtake mode).
