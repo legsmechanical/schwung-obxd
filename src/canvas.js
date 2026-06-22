@@ -36,54 +36,77 @@ function c(key, abbrev)        { return { key, abbrev, min: 0,  max: 100, step: 
 function t(key, abbrev)        { return { key, abbrev, min: 0,  max: 1,   step: 1, sens: 2 }; } // toggle
 function r(key, abbrev, lo, hi){ return { key, abbrev, min: lo, max: hi,  step: 1, sens: 3 }; } // small range
 
+/* Abbreviations drop anything the bank heading already implies (the "Osc 1" bank
+ * shows "Saw", not "O1Sw"); kept to <=4 chars to fit a cell. */
 const BANKS = [
   { label: "Osc 1", knobs: [
-    t("osc1_saw","O1Sw"), t("osc1_pulse","O1Pl"), c("osc1_pitch","O1Pt"), c("osc1_mix","O1Mx") ] },
+    t("osc1_saw","Saw"), t("osc1_pulse","Puls"), c("osc1_pitch","Ptch"), c("osc1_mix","Mix") ] },
   { label: "Osc 2", knobs: [
-    t("osc2_saw","O2Sw"), t("osc2_pulse","O2Pl"), c("osc2_pitch","O2Pt"), c("osc2_mix","O2Mx"),
-    c("osc2_detune","O2Dt"), t("osc2_sync","Sync"), t("osc_quantize","Quan") ] },
+    t("osc2_saw","Saw"), t("osc2_pulse","Puls"), c("osc2_pitch","Ptch"), c("osc2_mix","Mix"),
+    c("osc2_detune","Detn"), t("osc2_sync","Sync"), t("osc_quantize","Quan") ] },
   { label: "Osc Common", knobs: [
-    c("pw","PW"), c("pw_env","PWEn"), t("pw_env_both","PWBo"), c("pw_ofs","PWOf"),
+    c("pw","PW"), c("pw_env","PWEn"), t("pw_env_both","Both"), c("pw_ofs","Ofs"),
     c("noise","Nois"), c("xmod","XMod"), c("brightness","Brit") ] },
   { label: "Amp Env", knobs: [
-    c("attack","Atk"), c("decay","Dec"), c("sustain","Sus"), c("release","Rel"), c("vel_amp","VAmp") ] },
+    c("attack","Atk"), c("decay","Dec"), c("sustain","Sus"), c("release","Rel"), c("vel_amp","Vel") ] },
   { label: "Filter (1/2)", knobs: [
-    c("cutoff","Cut"), c("resonance","Res"), c("filter_env","FEnv"),
-    c("key_follow","KeyF"), c("multimode","Mult") ] },
+    c("cutoff","Cut"), c("resonance","Res"), c("filter_env","Env"),
+    c("key_follow","Key"), c("multimode","Mult") ] },
   { label: "Filter (2/2)", knobs: [
-    t("bandpass","BP"), t("fourpole","4Pol"), t("self_osc","Self"), t("fenv_inv","FInv") ] },
+    t("bandpass","BP"), t("fourpole","4Pol"), t("self_osc","Self"), t("fenv_inv","Inv") ] },
   { label: "Filter Env", knobs: [
-    c("f_attack","FAtk"), c("f_decay","FDec"), c("f_sustain","FSus"), c("f_release","FRel"),
-    c("vel_filter","VFlt") ] },
+    c("f_attack","Atk"), c("f_decay","Dec"), c("f_sustain","Sus"), c("f_release","Rel"),
+    c("vel_filter","Vel") ] },
   { label: "LFO", knobs: [
     c("lfo_rate","Rate"), c("lfo_amt1","Amt1"), c("lfo_amt2","Amt2"),
     t("lfo_sin","Sine"), t("lfo_square","Squr"), t("lfo_sh","S&H"), t("lfo_sync","Sync") ] },
   { label: "LFO Dest", knobs: [
-    t("lfo_osc1",">Os1"), t("lfo_osc2",">Os2"), t("lfo_filter",">Flt"),
-    t("lfo_pw1",">PW1"), t("lfo_pw2",">PW2") ] },
+    t("lfo_osc1","Osc1"), t("lfo_osc2","Osc2"), t("lfo_filter","Filt"),
+    t("lfo_pw1","PW1"), t("lfo_pw2","PW2") ] },
   { label: "Pitch Mod", knobs: [
-    c("env_pitch","EPit"), t("env_pitch_both","EPBo"), t("bend_range","Bend"),
-    t("bend_osc2","B>O2"), c("vibrato","Vib") ] },
+    c("env_pitch","Env"), t("env_pitch_both","Both"), t("bend_range","Bend"),
+    t("bend_osc2",">Os2"), c("vibrato","Vib") ] },
   { label: "Global (1/2)", knobs: [
     c("volume","Vol"), c("tune","Tune"), r("octave","Oct",-2,2),
-    r("octave_transpose","OctT",-3,3), c("portamento","Port") ] },
+    r("octave_transpose","Trsp",-3,3), c("portamento","Port") ] },
   { label: "Global (2/2)", knobs: [
     r("voice_count","Vcs",1,8), r("legato","Lgto",0,3), t("unison","Uni"),
-    c("unison_det","UDet"), t("as_played","AsPl") ] },
+    c("unison_det","Detn"), t("as_played","Play") ] },
   { label: "Voice Var (1/2)", knobs: [
-    c("filter_var","FVar"), c("porta_var","PVar"), c("env_var","EVar"), c("level_var","LVar") ] },
+    c("filter_var","Filt"), c("porta_var","Prta"), c("env_var","Env"), c("level_var","Lvl") ] },
   { label: "Voice Var (2/2)", knobs: [
     c("pan_1","Pan1"), c("pan_2","Pan2"), c("pan_3","Pan3"), c("pan_4","Pan4"),
     c("pan_5","Pan5"), c("pan_6","Pan6"), c("pan_7","Pan7"), c("pan_8","Pan8") ] }
 ];
 
-/* ---- drawing constants (davebox-derived 2x4 cell grid) ---- */
-var HDR_H = 9;                 // header band height
-var CELL_W = 30, CELL_H = 23;  // 4 cols x 30, 2 rows x 23
-var COL_X0 = 4, ROW_Y0 = HDR_H + 2;
+/* Bottom category tabs: one per logical group; split banks share a tab (Filter
+ * 1/2+2/2 -> Fl, LFO+LFO Dest -> LF, etc.). BANK_CAT maps bank index -> tab index. */
+var TABS = ["O1","O2","OC","Am","Fl","FE","LF","Pt","Gl","Vr"];
+var BANK_CAT = [0, 1, 2, 3, 4, 4, 5, 6, 6, 7, 8, 8, 9, 9];
+
+/* ---- drawing constants (2x4 cell grid + bottom tab bar) ---- */
+var HDR_H = 9;                 // header band height (bank label)
+var CELL_W = 30, CELL_H = 21;  // 4 cols x 30, 2 rows x 21 (shrunk for tab bar)
+var COL_X0 = 4, ROW_Y0 = HDR_H + 1, ROW_GAP = 2;
+var TAB_Y = 55;                // bottom tab bar top (rows end at 54)
 
 function cellX(k) { return COL_X0 + (k % 4) * CELL_W; }
-function cellY(k) { return k < 4 ? ROW_Y0 : ROW_Y0 + CELL_H + 3; }
+function cellY(k) { return k < 4 ? ROW_Y0 : ROW_Y0 + CELL_H + ROW_GAP; }
+
+/* bottom category tabs: 10 even cells; active = inverted (filled + black text) */
+function drawTabs(ctx, activeCat) {
+  var n = TABS.length;
+  for (var i = 0; i < n; i++) {
+    var x0 = Math.round(i * ctx.width / n);
+    var x1 = Math.round((i + 1) * ctx.width / n);
+    if (i === activeCat) {
+      ctx.fillRect(x0, TAB_Y, x1 - x0 - 1, 9, 1);
+      ctx.print(x0 + 1, TAB_Y + 1, TABS[i], 0);
+    } else {
+      ctx.print(x0 + 1, TAB_Y + 1, TABS[i], 1);
+    }
+  }
+}
 
 
 function readState(ctx) {
@@ -109,9 +132,19 @@ globalThis.bank_editor = {
   onMidi: function(ctx, payload) {
     var d = payload && payload.data;
     if (!d || d.length < 3) return;
-    if ((d[0] & 0xF0) !== 0xB0) return;   // CC only
-    var cc = d[1], val = d[2];
     var s = readState(ctx);
+    var status = d[0] & 0xF0;
+
+    // capacitive knob touch: notes 0-7 = knob 1-8 (on = vel>=64, release < 64).
+    // Highlight the touched param's cell; clear on release.
+    if (status === 0x90 || status === 0x80) {
+      var note = d[1];
+      if (note <= 7) s.lastKnob = (status === 0x90 && d[2] >= 64) ? note : -1;
+      return;
+    }
+
+    if (status !== 0xB0) return;          // CC only below
+    var cc = d[1], val = d[2];
 
     if (cc === 14) {                       // jog turn -> cycle bank
       var jd = dirFromCC(val);
@@ -146,27 +179,26 @@ globalThis.bank_editor = {
     var s = readState(ctx);
     var bank = BANKS[s.bank];
 
-    // header: bank label (left) + "N/M" position counter (right)
-    ctx.print(2, 1, bank.label.slice(0, 16), 1);
-    var pos = (s.bank + 1) + "/" + BANKS.length;
-    ctx.print(ctx.width - pos.length * 6 - 1, 1, pos, 1);
+    // header: black text on a white bar
+    ctx.fillRect(0, 0, ctx.width, HDR_H, 1);
+    ctx.print(2, 1, bank.label.slice(0, 20), 0);
 
-    // 8 cells in a fixed 2x4 grid; every cell outlined so the grid is obvious,
-    // empty cells (banks with <8 params) read as empty boxes, touched cell inverts.
+    // 8 params in a fixed 2x4 layout (no cell borders); touched cell inverts.
     for (var k = 0; k < 8; k++) {
       var pm = bank.knobs[k];
+      if (!pm) continue;                 // empty slot: nothing drawn
       var x = cellX(k), y = cellY(k);
-      var w = CELL_W - 2, h = CELL_H;
-      var hi = (k === s.lastKnob) && pm;
-      if (hi) ctx.fillRect(x, y, w, h, 1);
-      else ctx.drawRect(x, y, w, h, 1);
-      if (!pm) continue;                 // empty cell: outline only
+      var hi = (k === s.lastKnob);
+      if (hi) ctx.fillRect(x, y, CELL_W - 2, CELL_H, 1);
       var fg = hi ? 0 : 1;
       ctx.print(x + 2, y + 2, pm.abbrev, fg);
       var raw = ctx.getParam(pm.key);
       var txt = (raw === null || raw === undefined || raw === "") ? "-" : String(raw);
       ctx.print(x + 2, y + 13, txt, fg);
     }
+
+    ctx.fillRect(0, TAB_Y - 1, ctx.width, 1, 1);   // separator line above tabs
+    drawTabs(ctx, BANK_CAT[s.bank]);                // bottom category-tab bar, active inverted
   },
 
   _test: { dirFromCC: dirFromCC, clampBank: clampBank, accumStep: accumStep, BANKS: BANKS }
