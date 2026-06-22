@@ -290,13 +290,18 @@ Claude-Session: https://claude.ai/code/session_017fZojSLfPB7Cpn4SLDh5Xh"
  * (not relying on whatever the default patch happens to be). */
 #include "harness.hpp"
 
-/* Set a known audible patch (native-int param contract; continuous = 0..100). */
+/* Set a known audible patch (native-int param contract; continuous = 0..100).
+ * brightness is MANDATORY: v2_init_default_patch never calls processBrightness(),
+ * leaving a ~1 Hz lowpass that silences the default patch (found in Task 1). */
 static void audible_patch(hx_t *h) {
-    hx_set_param(h, "volume",  "80");
-    hx_set_param(h, "cutoff",  "90");
-    hx_set_param(h, "attack",  "0");
-    hx_set_param(h, "sustain", "100");
-    hx_set_param(h, "release", "0");   /* fast release so note-off silences quickly */
+    hx_set_param(h, "brightness", "100");  /* REQUIRED — default patch is silent without it */
+    hx_set_param(h, "osc1_saw",   "1");
+    hx_set_param(h, "osc1_mix",   "100");
+    hx_set_param(h, "volume",     "100");
+    hx_set_param(h, "cutoff",     "90");
+    hx_set_param(h, "attack",     "0");
+    hx_set_param(h, "sustain",    "100");
+    hx_set_param(h, "release",    "0");   /* fast release so note-off silences quickly */
 }
 
 int main() {
@@ -412,12 +417,16 @@ static void render_scenario(hx_t *h) {
     hx_set_param(h, "env_var",    "0");
     hx_set_param(h, "level_var",  "0");
     hx_set_param(h, "unison",     "0");
-    /* fixed audible patch */
-    hx_set_param(h, "volume",  "80");
-    hx_set_param(h, "cutoff",  "70");
-    hx_set_param(h, "attack",  "0");
-    hx_set_param(h, "sustain", "100");
-    hx_set_param(h, "release", "0");
+    /* fixed audible patch (brightness REQUIRED — see Task 1: default patch is
+     * silent because v2_init_default_patch never calls processBrightness) */
+    hx_set_param(h, "brightness", "100");
+    hx_set_param(h, "osc1_saw",   "1");
+    hx_set_param(h, "osc1_mix",   "100");
+    hx_set_param(h, "volume",     "80");
+    hx_set_param(h, "cutoff",     "70");
+    hx_set_param(h, "attack",     "0");
+    hx_set_param(h, "sustain",    "100");
+    hx_set_param(h, "release",    "0");
 
     hx_audio_clear(h);
     uint8_t on[3] = { 0x90, 60, 100 };   /* middle C, held */
