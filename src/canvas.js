@@ -117,7 +117,8 @@ globalThis.bank_editor = {
       var jd = dirFromCC(val);
       if (jd) {
         s.bank = clampBank(s.bank + jd, BANKS.length);
-        ctx.setValue(s.bank);              // persist for re-open
+        s.lastKnob = -1;                   // clear stale highlight on bank switch
+        ctx.setValue(String(s.bank));      // persist for re-open
       }
       return;
     }
@@ -137,7 +138,7 @@ globalThis.bank_editor = {
       var nv = cur + dir * pm.step;
       if (nv < pm.min) nv = pm.min;
       if (nv > pm.max) nv = pm.max;
-      if (nv !== cur) ctx.setParam(pm.key, nv);  // one write per onMidi (no race)
+      if (nv !== cur) ctx.setParam(pm.key, String(nv));  // one write per onMidi (no race)
     }
   },
 
