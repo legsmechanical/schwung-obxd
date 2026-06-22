@@ -77,6 +77,102 @@ const BANKS = [
     c("pan_5","Pan5"), c("pan_6","Pan6"), c("pan_7","Pan7"), c("pan_8","Pan8") ] }
 ];
 
+/* ---- drawing constants (davebox-derived 2x4 cell grid) ---- */
+var HDR_H = 9;                 // header band height
+var CELL_W = 30, CELL_H = 23;  // 4 cols x 30, 2 rows x 23
+var COL_X0 = 4, ROW_Y0 = HDR_H + 2;
+
+function cellX(k) { return COL_X0 + (k % 4) * CELL_W; }
+function cellY(k) { return k < 4 ? ROW_Y0 : ROW_Y0 + CELL_H + 3; }
+
+/* draw the right-aligned bank-position strip; active bank = tall block */
+function drawBankStrip(ctx, active, count) {
+  var pitch = 4, w = 3;
+  var x = ctx.width - 4 - (count - 1) * pitch; // left edge so the strip is right-aligned
+  for (var i = 0; i < count; i++) {
+    var bx = x + i * pitch;
+    if (i === active) ctx.fillRect(bx, 0, w, 7, 1);
+    else ctx.fillRect(bx, 4, w, 2, 1);
+  }
+}
+
+function readState(ctx) {
+  var s = ctx.state;
+  if (!s.init) {
+    s.init = true;
+    var b = parseInt(ctx.getValue() || "0", 10);
+    if (isNaN(b)) b = 0;
+    s.bank = clampBank(b, BANKS.length);
+    s.accum = [0,0,0,0,0,0,0,0];
+    s.lastKnob = -1;
+  }
+  return s;
+}
+
 globalThis.bank_editor = {
+  onOpen: function(ctx) {
+    var s = ctx.state;
+    s.init = false;        // force re-seed from the persisted param value
+    readState(ctx);
+  },
+
+  onMidi: function(ctx, payload) {
+    var d = payload && payload.data;
+    if (!d || d.length < 3) return;
+    if ((d[0] & 0xF0) !== 0xB0) return;   // CC only
+    var cc = d[1], val = d[2];
+    var s = readState(ctx);
+
+    if (cc === 14) {                       // jog turn -> cycle bank
+      var jd = dirFromCC(val);
+      if (jd) {
+        s.bank = clampBank(s.bank + jd, BANKS.length);
+        ctx.setValue(s.bank);              // persist for re-open
+      }
+      return;
+    }
+
+    if (cc >= 71 && cc <= 78) {            // encoder -> edit param
+      var k = cc - 71;
+      var pm = BANKS[s.bank].knobs[k];
+      if (!pm) return;                     // empty cell on this bank
+      var dir = dirFromCC(val);
+      if (!dir) return;
+      s.lastKnob = k;
+      var res = accumStep(s.accum[k], dir, pm.sens);
+      s.accum[k] = res.accum;
+      if (!res.fire) return;
+      var cur = parseInt(ctx.getParam(pm.key) || "0", 10);
+      if (isNaN(cur)) cur = 0;
+      var nv = cur + dir * pm.step;
+      if (nv < pm.min) nv = pm.min;
+      if (nv > pm.max) nv = pm.max;
+      if (nv !== cur) ctx.setParam(pm.key, nv);  // one write per onMidi (no race)
+    }
+  },
+
+  draw: function(ctx) {
+    var s = readState(ctx);
+    var bank = BANKS[s.bank];
+
+    // header: bank label (left) + position strip (right)
+    ctx.print(2, 1, bank.label.slice(0, 16), 1);
+    drawBankStrip(ctx, s.bank, BANKS.length);
+
+    // 8 cells
+    for (var k = 0; k < 8; k++) {
+      var pm = bank.knobs[k];
+      var x = cellX(k), y = cellY(k);
+      var hi = (k === s.lastKnob) && pm;
+      if (hi) ctx.fillRect(x, y, CELL_W - 2, CELL_H, 1);
+      if (!pm) continue;
+      var fg = hi ? 0 : 1;
+      ctx.print(x + 1, y + 1, pm.abbrev, fg);
+      var raw = ctx.getParam(pm.key);
+      var txt = (raw === null || raw === undefined || raw === "") ? "-" : String(raw);
+      ctx.print(x + 1, y + 12, txt, fg);
+    }
+  },
+
   _test: { dirFromCC: dirFromCC, clampBank: clampBank, accumStep: accumStep, BANKS: BANKS }
 };
