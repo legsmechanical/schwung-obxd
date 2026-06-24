@@ -222,7 +222,7 @@ index 0000000..ea49d3f
 +  _test: { dirFromCC: dirFromCC, clampBank: clampBank, accumStep: accumStep, BANKS: BANKS }
 +};
 diff --git a/src/dsp/obxd_plugin.cpp b/src/dsp/obxd_plugin.cpp
-index 5e7a4c9..7c01709 100644
+index f54821c..eedd8bf 100644
 --- a/src/dsp/obxd_plugin.cpp
 +++ b/src/dsp/obxd_plugin.cpp
 @@ -326,6 +326,7 @@ typedef struct {
@@ -241,7 +241,7 @@ index 5e7a4c9..7c01709 100644
          v2_switch_bank(inst, 0);
      }
  
-@@ -1093,6 +1095,12 @@ static void v2_set_param(void *instance, const char *key, const char *val) {
+@@ -1108,6 +1110,12 @@ static void v2_set_param(void *instance, const char *key, const char *val) {
              v2_apply_param(inst, inst->param_bank, idx, fval);
          }
      }
@@ -254,7 +254,7 @@ index 5e7a4c9..7c01709 100644
      else {
          /* Named parameter access (shadow UI / remote UI) — value is a native int */
          for (int i = 0; i < (int)PARAM_DEF_COUNT(g_shadow_params); i++) {
-@@ -1126,6 +1134,9 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
+@@ -1141,6 +1149,9 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
      if (strcmp(key, "bank_index") == 0) {
          return snprintf(buf, buf_len, "%d", inst->current_bank);
      }
@@ -264,7 +264,7 @@ index 5e7a4c9..7c01709 100644
      if (strcmp(key, "bank_count") == 0) {
          return snprintf(buf, buf_len, "%d", inst->bank_count);
      }
-@@ -1194,6 +1205,7 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
+@@ -1209,6 +1220,7 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
                      "\"children\":null,"
                      "\"knobs\":[\"cutoff\",\"resonance\",\"filter_env\",\"attack\",\"decay\",\"sustain\",\"release\",\"octave_transpose\"],"
                      "\"params\":["
@@ -272,7 +272,7 @@ index 5e7a4c9..7c01709 100644
                          "{\"level\":\"banks\",\"label\":\"Banks\"},"
                          "{\"level\":\"global\",\"label\":\"Global\"},"
                          "{\"level\":\"osc1\",\"label\":\"Oscillator 1\"},"
-@@ -1311,7 +1323,9 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
+@@ -1326,7 +1338,9 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
          int offset = 0;
          offset += snprintf(buf + offset, buf_len - offset,
              "[{\"key\":\"preset\",\"name\":\"Preset\",\"type\":\"int\",\"min\":0,\"max\":9999},"

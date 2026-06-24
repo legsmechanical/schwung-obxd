@@ -13,7 +13,7 @@ inside co-run (host-side, unfixed). See the workspace worklog `_worklogs/schwung
 
 Touches only: `src/canvas.js` (new), `tests/canvas_*.test.mjs` (new), `src/dsp/obxd_plugin.cpp`
 (+16 lines: `editor` canvas chain-param, root menu entry, `editor_bank` get/set), `scripts/build.sh`
-(+1 line: package `canvas.js`). Generated against pre-feature base `75a4c44`.
+(+1 line: package `canvas.js`). Generated against pre-feature base `upstream/main` (v0.4.7 `57d03dd`).
 
 ### Re-apply after an upstream rebase/reset
 
@@ -32,6 +32,6 @@ node tests/canvas_helpers.test.mjs && node tests/canvas_banks.test.mjs && node -
 To regenerate after further tweaks on `main`:
 
 ```bash
-git diff 75a4c44 HEAD -- src/canvas.js tests/canvas_helpers.test.mjs tests/canvas_banks.test.mjs \
+git diff upstream/main HEAD -- src/canvas.js tests/canvas_helpers.test.mjs tests/canvas_banks.test.mjs \
   src/dsp/obxd_plugin.cpp scripts/build.sh > patches/bank-editor-canvas.patch
 ```
