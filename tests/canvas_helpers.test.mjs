@@ -92,9 +92,7 @@ eq(T.accumStep(1, -1, 2), { accum: -1, fire: false }, "accum reversal resets the
   midi(49, 127);                       // SHIFT down (CC 49, the real Move shift)
   eq(ctx.state.shift, true, "shift registers on CC 49");
   midi(14, 1);
-  eq(ctx.state.bank, 4, "shift+jog: first detent doesn't step (NAV_SENS 2)");
-  midi(14, 1);
-  eq(ctx.state.bank, 5, "shift+jog: 2nd detent jumps to next SECTION (Filter Env)");
+  eq(ctx.state.bank, 5, "shift+jog: one detent jumps to next SECTION (Filter Env)");
   midi(49, 0);                         // SHIFT up
   eq(ctx.state.shift, false, "shift releases");
   ctx.state.bank = T.BANKS.length - 1;
@@ -107,7 +105,7 @@ eq(T.accumStep(1, -1, 2), { accum: -1, fire: false }, "accum reversal resets the
   globalThis.shadow_get_shift_held = () => 1;
   ctx.state.bank = 3;                  // Filter
   ctx.state.jogAccum = 0;
-  midi(14, 1); midi(14, 1);
+  midi(14, 1);
   eq(ctx.state.bank, 5, "SHM shift (no CC 49) drives section jump");
   delete globalThis.shadow_get_shift_held;
 }

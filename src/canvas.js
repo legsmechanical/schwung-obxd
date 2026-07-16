@@ -235,9 +235,9 @@ const BANKS = [
   { label: "Global", knobs: [uni("volume", "Vol"), bip("tune", "Tune"), oct("octave", "Oct", -2, 2), oct("octave_transpose", "Trsp", -3, 3), uni("portamento", "Port"), count("voice_count", "Vcs", 1, 8), enumc("legato", "Lgto", kLegatoLabels, ["RTG", "LG1", "LG2", "KEP"]), tog("as_played", "Play")] }
 ];
 
-/* Detents per step while scrolling the SHIFT section picker (slower than
- * plain jog bank-stepping, which stays 1:1). */
-const NAV_SENS = 2;
+/* Detents per step while scrolling the SHIFT section picker (1 = one item
+ * per jog click, same as plain bank-stepping). */
+const NAV_SENS = 1;
 
 /* Shift+jog jump targets — the section picker. Plain jog steps every bank
  * overlay-free (each page is visible as you pass it), so the picker stays
