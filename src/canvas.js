@@ -108,6 +108,67 @@ function pfPrint(ctx, x, y, text, color) {
   }
 }
 
+/* ---- 5x3 micro font (ported from schwung-movy src/font/glyphs5x3.ts, MIT,
+ * (c) 2026 megadake) — used INSIDE the 16px movy-style widget boxes (enum
+ * squares, value squares), where the 6px-advance 5x5 font can't fit. Glyph
+ * format: [advance, yOff, w, h, ...rowBits], bit0 = leftmost pixel. ---- */
+var PF3_CHARS = " !\"'()+,-./:0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ%<>=?*";
+var PF3_G = [
+  [4,0,0,0],
+  [4,0,3,5,1,1,1,0,1], [4,0,3,5,5,5,0,0,0], [4,0,3,5,2,2,0,0,0],
+  [4,0,3,5,2,1,1,1,2], [4,0,3,5,1,2,2,2,1], [4,0,3,5,2,7,2,0,0],
+  [4,0,3,5,0,0,3,3,2], [4,0,3,5,0,0,7,0,0], [4,0,3,5,0,0,0,3,3],
+  [4,0,3,5,4,4,2,1,1], [4,0,3,5,3,3,0,3,3],
+  [4,0,3,5,7,5,5,5,7], [4,0,3,5,2,6,2,2,7], [4,0,3,5,7,4,7,1,7],
+  [4,0,3,5,7,4,6,4,7], [4,0,3,5,5,5,7,4,4], [4,0,3,5,7,1,7,4,7],
+  [4,0,3,5,7,1,7,5,7], [4,0,3,5,7,4,4,4,4], [4,0,3,5,7,5,7,5,7],
+  [4,0,3,5,7,5,7,4,7],
+  [4,0,3,5,2,7,5,5,5], [4,0,3,5,7,5,3,5,7], [4,0,3,5,7,1,1,1,7],
+  [4,0,3,5,3,5,5,5,3], [4,0,3,5,7,1,3,1,7], [4,0,3,5,7,1,3,1,1],
+  [4,0,3,5,7,1,5,5,7], [4,0,3,5,5,5,7,5,5], [4,0,3,5,7,2,2,2,7],
+  [4,0,3,5,4,4,4,5,7], [4,0,3,5,5,5,3,5,5], [4,0,3,5,1,1,1,1,7],
+  [4,0,3,5,5,7,5,5,5], [4,0,3,5,5,3,5,5,5], [4,0,3,5,7,5,5,5,7],
+  [4,0,3,5,7,5,7,1,1], [4,0,3,5,3,5,5,7,2], [4,0,3,5,7,5,3,5,5],
+  [4,0,3,5,6,1,2,4,3], [4,0,3,5,7,2,2,2,2], [4,0,3,5,5,5,5,5,7],
+  [4,0,3,5,5,5,5,5,2], [4,0,3,5,5,5,5,7,7], [4,0,3,5,5,5,2,5,5],
+  [4,0,3,5,5,5,7,2,2], [4,0,3,5,7,4,2,1,7],
+  [4,0,3,5,5,4,2,1,5], [4,0,3,5,4,2,1,2,4], [4,0,3,5,1,2,4,2,1],
+  [4,0,3,5,7,0,7,0,0], [4,0,3,5,7,4,6,0,2], [4,0,3,5,2,7,2,5,0]
+];
+
+function pf3Glyph(ch) {
+  var i = PF3_CHARS.indexOf(ch);
+  return i >= 0 ? PF3_G[i] : null;
+}
+function pf3Width(text) {
+  var s = String(text).toUpperCase(), w = 0;
+  for (var i = 0; i < s.length; i++) { var g = pf3Glyph(s[i]); w += g ? g[0] : 4; }
+  return w;
+}
+function pf3Print(ctx, x, y, text, color) {
+  var s = String(text).toUpperCase(), cx = Math.round(x), oy = Math.round(y);
+  var v = color ? 1 : 0;
+  for (var i = 0; i < s.length; i++) {
+    var g = pf3Glyph(s[i]);
+    if (!g) { cx += 4; continue; }
+    var yOff = g[1], w = g[2], h = g[3];
+    for (var r = 0; r < h; r++) {
+      var bits = g[4 + r];
+      for (var c = 0; c < w; c++) if (bits & (1 << c)) ctx.setPixel(cx + c, oy + yOff + r, v);
+    }
+    cx += g[0];
+  }
+}
+
+/* Split an enum value into two <=3-char lines for the 16px enum square
+ * (movy's enumSquareLines): word-split when possible, else a hard split. */
+function enumSquareLines(value) {
+  var parts = String(value).toUpperCase().replace(/[_\-]/g, " ").trim().split(/\s+/);
+  if (parts.length >= 2) return [parts[0].substring(0, 3), parts[1].substring(0, 3)];
+  var w = parts[0];
+  return [w.substring(0, 3), w.substring(3, 6)];
+}
+
 /* ---- enum label tables ---- */
 
 const kToggleLabels = ["Off", "On"];
@@ -145,7 +206,9 @@ const DEFAULTS = {
 function uni(key, label) { return { key, label, kind: "unipolar", min: 0, max: 100, step: 1, sens: 2 }; }
 function bip(key, label) { return { key, label, kind: "bipolar", min: 0, max: 100, step: 1, sens: 2, dflt: 50 }; }
 function tog(key, label) { return { key, label, kind: "enum", min: 0, max: 1, step: 1, sens: 3, options: kToggleLabels }; }
-function enumc(key, label, options) { return { key, label, kind: "enum", min: 0, max: options.length - 1, step: 1, sens: 3, options }; }
+/* `sq` (optional): per-option single-line labels for the 16px enum square,
+ * when enumSquareLines's auto word-split would read badly ("KEE/P"). */
+function enumc(key, label, options, sq) { return { key, label, kind: "enum", min: 0, max: options.length - 1, step: 1, sens: 3, options, sq }; }
 function oct(key, label, lo, hi) { return { key, label, kind: "octave", min: lo, max: hi, step: 1, sens: 3 }; }
 function count(key, label, lo, hi) { return { key, label, kind: "count", min: lo, max: hi, step: 1, sens: 3 }; }
 function fader(key, label) { return { key, label, kind: "fader", min: 0, max: 100, step: 1, sens: 2 }; }
@@ -161,14 +224,14 @@ const BANKS = [
   { label: "Osc Common", knobs: [uni("pw", "PW"), uni("pw_env", "PWEn"), tog("pw_env_both", "Both"), uni("pw_ofs", "POfs"), uni("noise", "Nois"), uni("xmod", "XMod"), uni("brightness", "Brit")] },
   { label: "Filter", knobs: [uni("cutoff", "Cut"), uni("resonance", "Res"), uni("filter_env", "Env"), uni("key_follow", "Key"), uni("multimode", "Mult")] },
   { label: "Filter Mode", knobs: [tog("bandpass", "BP"), tog("fourpole", "4Pol"), tog("self_osc", "Self"), tog("fenv_inv", "Inv")] },
-  { label: "Filter Env", knobs: [fader("f_attack", "A"), fader("f_decay", "D"), fader("f_sustain", "S"), fader("f_release", "R"), fader("vel_filter", "Vel")] },
-  { label: "Amp Env", knobs: [fader("attack", "A"), fader("decay", "D"), fader("sustain", "S"), fader("release", "R"), fader("vel_amp", "Vel")] },
+  { label: "Filter Env", env: true, knobs: [fader("f_attack", "A"), fader("f_decay", "D"), fader("f_sustain", "S"), fader("f_release", "R"), fader("vel_filter", "Vel")] },
+  { label: "Amp Env", env: true, knobs: [fader("attack", "A"), fader("decay", "D"), fader("sustain", "S"), fader("release", "R"), fader("vel_amp", "Vel")] },
   { label: "LFO", knobs: [uni("lfo_rate", "Rate"), uni("lfo_amt1", "Amt1"), uni("lfo_amt2", "Amt2"), tog("lfo_sin", "Sin"), tog("lfo_square", "Sqr"), tog("lfo_sh", "S/H"), tog("lfo_sync", "Sync")] },
   { label: "LFO Dest", knobs: [tog("lfo_osc1", "Osc1"), tog("lfo_osc2", "Osc2"), tog("lfo_filter", "Filt"), tog("lfo_pw1", "PW1"), tog("lfo_pw2", "PW2")] },
   { label: "Pitch Mod", knobs: [uni("env_pitch", "Env"), tog("env_pitch_both", "Both"), tog("bend_range", "Bend"), tog("bend_osc2", ">Os2"), uni("vibrato", "Vib")] },
   { label: "Voice", knobs: [tog("unison", "Uni"), uni("unison_det", "Detn"), uni("filter_var", "Filt"), uni("porta_var", "Prta"), uni("env_var", "Env"), uni("level_var", "Lvl")] },
   { label: "Pan", knobs: [bip("pan_1", "V1"), bip("pan_2", "V2"), bip("pan_3", "V3"), bip("pan_4", "V4"), bip("pan_5", "V5"), bip("pan_6", "V6"), bip("pan_7", "V7"), bip("pan_8", "V8")] },
-  { label: "Global", knobs: [uni("volume", "Vol"), bip("tune", "Tune"), oct("octave", "Oct", -2, 2), oct("octave_transpose", "Trsp", -3, 3), uni("portamento", "Port"), count("voice_count", "Vcs", 1, 8), enumc("legato", "Lgto", kLegatoLabels), tog("as_played", "Play")] }
+  { label: "Global", knobs: [uni("volume", "Vol"), bip("tune", "Tune"), oct("octave", "Oct", -2, 2), oct("octave_transpose", "Trsp", -3, 3), uni("portamento", "Port"), count("voice_count", "Vcs", 1, 8), enumc("legato", "Lgto", kLegatoLabels, ["RTG", "LG1", "LG2", "KEP"]), tog("as_played", "Play")] }
 ];
 
 /* Shift+jog jump targets — the section picker. A section "owns" every bank
@@ -220,7 +283,6 @@ function readState(ctx) {
  * given (ctx, bank, cells, state), paint the 128x64 frame) ---- */
 
 const HDR_H = 9;
-const CONTENT_BOT = 64;   // no bottom tab bar — content runs to the last row (63)
 
 function getRaw(ctx, cell) {
   const fallback = cell.dflt != null ? cell.dflt : cell.min;
@@ -380,143 +442,232 @@ function drawSectionNav(ctx, s) {
   ctx.fillRect(x + w - 3, thumbY, 2, thumbH, 1);
 }
 
-/* Small vertical slider: end-stop ticks top/bottom + a bottom-up proportional
- * fill — used by the Filter/Amp Env fader banks. */
-function drawFader(ctx, x, y, h, frac, fg, w) {
-  w = w || 2;
-  ctx.fillRect(x, y, w, 1, fg);
-  ctx.fillRect(x, y + h - 1, w, 1, fg);
-  const fillH = Math.round((h - 2) * frac);
-  if (fillH > 0) ctx.fillRect(x, y + (h - 1 - fillH), w, fillH, fg);
-}
+/* ---- movy-style widget renderers (ported/adapted from schwung-movy
+ * src/renderer/{knob,envelope,label,header,overlay}.ts, MIT (c) 2026 megadake)
+ * — the hybrid experiment: movy's Elektron-ish widget language (arc knobs,
+ * bar toggles, framed enum/value squares, name<->value label swap, segmented
+ * bank bar, full-row ADSR graphic, enum list overlay) driven by OUR bank
+ * model, header/icons, and SHIFT/jog-touch section picker. ---- */
 
-/* Value bar under a cell. Unipolar -> left-anchored proportional fill.
- * Bipolar (center-detent kinds) -> a center-OUT fill: a permanent 1px center
- * tick, the bar growing rightward for + and leftward for -, so "how far and
- * which way from neutral" reads at a glance. Returns true if it drew. */
-function drawValueBar(ctx, x, y, w, th, fmt, fg) {
-  const bg = fg === 1 ? 0 : 1;
-  if (fmt.centerBar != null) {
-    ctx.fillRect(x, y, w, th, bg); // clear track
-    const half = Math.floor(w / 2), cx = x + half;
-    const sgn = Math.max(-1, Math.min(1, fmt.centerBar));
-    const mag = Math.round(half * Math.abs(sgn));
-    if (sgn >= 0) { if (mag > 0) ctx.fillRect(cx, y, mag, th, fg); }
-    else if (mag > 0) ctx.fillRect(cx - mag, y, mag, th, fg);
-    ctx.fillRect(cx, y, 1, th, fg); // center detent tick, always visible
-    return true;
-  }
-  if (fmt.bar != null) {
-    ctx.fillRect(x, y, w, th, bg); // clear track
-    const fillW = Math.round(w * fmt.bar);
-    if (fillW > 0) ctx.fillRect(x, y, fillW, th, fg);
-    return true;
-  }
-  return false;
-}
+/* Layout: 9px inverted header, 2px bank bar, then two 16px widget rows each
+ * with a 7px label strip beneath. */
+const BAR_Y = 10, ROW0_Y = 13, LBL0_Y = 29, ROW1_Y = 37, LBL1_Y = 53;
+const CELL_W = 32, KW = 16, LBL_H = 7;
 
-/* A label+value(+bar/fader) box at (x,y,w,h). Used by the grid cells and the
- * single-row layout's full-height cells. */
-function drawCellBox(ctx, x, y, w, h, label, fmt, highlighted) {
-  if (highlighted) ctx.fillRect(x, y, w, h, 1);
-  const fg = highlighted ? 0 : 1;
-  const innerW = w - 4;
-  if (fmt.fader !== null && h >= 18) {
-    // The slider IS the readout here — no digital number, like a real fader.
-    ctx.print(x + 2, y + 1, fitText(ctx, label, innerW), fg);
-    drawFader(ctx, x + Math.round(w / 2) - 1, y + 8, h - 9, fmt.fader, fg);
-    return;
-  }
-  if (h < 18) {
-    // short cell: label only (no room for a stacked value/bar)
-    ctx.print(x + 2, y + 1, fitText(ctx, label, innerW), fg);
-    return;
-  }
-  // Vertically center the label -> value (-> bar) block in the cell. Center by
-  // the SAME block height whether or not the cell has a bar, so label/value
-  // rows align across mixed cells in a row (enum cells next to bar cells).
-  const hasBar = fmt.bar != null || fmt.centerBar != null;
-  const blockH = 20;
-  const ly = y + Math.max(1, Math.floor((h - blockH) / 2));
-  ctx.print(x + 2, ly, fitText(ctx, label, innerW), fg);
-  ctx.print(x + 2, ly + 8, fitText(ctx, fmt.text, innerW), fg);
-  if (hasBar) drawValueBar(ctx, x + 2, ly + 18, innerW, 2, fmt, fg);
-}
-
-/* ---- "all faders" bank special-case (Filter/Amp Env): one row of labels,
- * one row of sliders beneath using ALL remaining vertical space. ---- */
-function drawEnvGrid(ctx, cells, s) {
-  const n = cells.length;
-  const top = HDR_H + 1, bottom = CONTENT_BOT - 1;
-  const colW = Math.floor(124 / n);
-  const FW = 6;   // fader bar width
-  for (let i = 0; i < n; i++) {
-    const cell = cells[i];
-    if (!cell) continue;
-    const x = 2 + i * colW;
-    const hi = i === s.lastKnob;
-    // highlight only the LABEL (not the whole column) so which knob's active
-    // reads without the big invert-block hiding the bar.
-    const lab = fitText(ctx, cell.label, colW - 4);
-    if (hi) ctx.fillRect(x + 1, top, ctx.measureText(lab) + 2, 8, 1);
-    ctx.print(x + 2, top + 1, lab, hi ? 0 : 1);
-    const raw = getRaw(ctx, cell);
-    const sliderY = top + 8, sliderH = bottom - sliderY - 1;
-    const sx = x + Math.round(colW / 2) - Math.floor(FW / 2);
-    const frac = Math.max(0, Math.min(1, (raw - cell.min) / (cell.max - cell.min)));
-    drawFader(ctx, sx, sliderY, sliderH, frac, 1, FW);
+/* Segmented bank-position bar: one segment per bank, the active one 2px tall.
+ * Always-on "you are here" glance; the SHIFT picker stays the jump tool. */
+function drawBankBar(ctx, active, count) {
+  const segW = Math.floor((ctx.width - (count - 1)) / count);
+  for (let b = 0; b < count; b++) {
+    const sx = b * (segW + 1);
+    const sw = b === count - 1 ? ctx.width - sx : segW;
+    ctx.fillRect(sx, BAR_Y, sw, b === active ? 2 : 1, 1);
   }
 }
 
-/* Sparse-bank layout: a bank with only 2-4 params reads as unfinished in the
- * 2x4 grid (empty boxes), so it gets a single ROW of N equal, full-height
- * cells instead. */
-function drawRowGrid(ctx, cells, s) {
-  const n = cells.length;
-  const gLeft = 0, gRight = 128, gTop = HDR_H, gBot = CONTENT_BOT - 1;
-  ctx.drawRect(gLeft, gTop, gRight - gLeft, gBot - gTop, 1);
-  const colW = Math.floor((gRight - gLeft) / n);
-  for (let i = 1; i < n; i++) ctx.fillRect(gLeft + i * colW, gTop, 1, gBot - gTop, 1);
-  for (let i = 0; i < n; i++) {
-    const cell = cells[i];
-    if (!cell) continue;
-    const lx = gLeft + i * colW;
-    const rx = i === n - 1 ? gRight - 1 : gLeft + (i + 1) * colW;
-    drawCellBox(ctx, lx + 1, gTop + 1, rx - lx - 1, gBot - gTop - 2, cell.label, formatCell(ctx, cell), i === s.lastKnob);
+function drawCircleBorder(ctx, cx, cy, r) {
+  let x = r, y = 0, err = 0;
+  while (x >= y) {
+    ctx.setPixel(cx + x, cy + y, 1); ctx.setPixel(cx + y, cy + x, 1);
+    ctx.setPixel(cx - y, cy + x, 1); ctx.setPixel(cx - x, cy + y, 1);
+    ctx.setPixel(cx - x, cy - y, 1); ctx.setPixel(cx - y, cy - x, 1);
+    ctx.setPixel(cx + y, cy - x, 1); ctx.setPixel(cx + x, cy - y, 1);
+    y++;
+    if (err <= 0) err += 2 * y + 1;
+    if (err > 0) { x--; err -= 2 * x + 1; }
   }
 }
 
-/* ---- the main layout: framed 2x4 grid with dividers ---- */
-function drawGrid(ctx, bank, cells, s) {
+/* Arc knob: circle + a pointer line sweeping 300 degrees (210 -> 510).
+ * Bipolar cells get a 12-o'clock center tick inside the dial so the neutral
+ * position reads (pan center, tune 0). */
+function drawArcKnob(ctx, kx, ky, norm, bipolar) {
+  const cx = kx + 7, cy = ky + 7, r = 7;
+  drawCircleBorder(ctx, cx, cy, r);
+  if (bipolar) ctx.fillRect(cx, cy - r + 1, 1, 2, 1);
+  const rad = (210 + norm * 300) * Math.PI / 180;
+  const ex = Math.round(cx + r * Math.sin(rad));
+  const ey = Math.round(cy - r * Math.cos(rad));
+  plotLine(ctx, cx, cy, ex, ey, 1);
+}
+
+/* Horizontal bar filling left->right — the movy binary widget (toggles). */
+function drawHBar(ctx, kx, ky, norm) {
+  ctx.fillRect(kx + 1, ky + 5, 14, 1, 1);
+  ctx.fillRect(kx + 1, ky + 10, 14, 1, 1);
+  ctx.fillRect(kx + 1, ky + 5, 1, 6, 1);
+  ctx.fillRect(kx + 14, ky + 5, 1, 6, 1);
+  const fillW = Math.round(norm * 12);
+  if (fillW > 0) ctx.fillRect(kx + 2, ky + 6, fillW, 4, 1);
+}
+
+/* Vertical bar filling bottom->up — mix/level feel (env Vel cells). */
+function drawVBar(ctx, kx, ky, norm) {
+  ctx.fillRect(kx + 5, ky + 1, 6, 1, 1);
+  ctx.fillRect(kx + 5, ky + 14, 6, 1, 1);
+  ctx.fillRect(kx + 5, ky + 1, 1, 14, 1);
+  ctx.fillRect(kx + 10, ky + 1, 1, 14, 1);
+  const fillH = Math.round(norm * 12);
+  if (fillH > 0) ctx.fillRect(kx + 6, ky + 2 + (12 - fillH), 4, fillH, 1);
+}
+
+/* 16x16 framed square with the enum value as up to two 3-char 5x3 lines
+ * (or a single provided square label). */
+function drawEnumSquare(ctx, kx, ky, text, sqText) {
+  ctx.drawRect(kx, ky, KW, KW, 1);
+  const lines = sqText != null ? [String(sqText), ""] : enumSquareLines(text);
+  const inner = KW - 2;
+  const totalH = lines[1].length > 0 ? 11 : 5;
+  const startY = ky + 1 + Math.floor((inner - totalH) / 2);
+  const w1 = pf3Width(lines[0]);
+  pf3Print(ctx, kx + 1 + Math.floor((inner - w1) / 2), startY, lines[0], 1);
+  if (lines[1].length > 0) {
+    const w2 = pf3Width(lines[1]);
+    pf3Print(ctx, kx + 1 + Math.floor((inner - w2) / 2), startY + 6, lines[1], 1);
+  }
+}
+
+/* 16x16 framed square with a single centered 5x3 value ("+2", "6"). */
+function drawValSquare(ctx, kx, ky, text) {
+  ctx.drawRect(kx, ky, KW, KW, 1);
+  const w = pf3Width(text);
+  pf3Print(ctx, kx + 1 + Math.floor((KW - 2 - w) / 2), ky + 1 + Math.floor((KW - 2 - 5) / 2), text, 1);
+}
+
+function normOf(ctx, cell) {
+  const frac = (getRaw(ctx, cell) - cell.min) / (cell.max - cell.min);
+  return Math.max(0, Math.min(1, frac));
+}
+
+/* Which movy widget a cell kind renders as. */
+function widgetFor(cell) {
+  if (cell.kind === "enum") return cell.options.length <= 2 ? "hbar" : "enumsq";
+  if (cell.kind === "octave" || cell.kind === "count") return "valsq";
+  if (cell.kind === "bipolar") return "arcbip";
+  if (cell.kind === "fader") return "vbar";
+  return "arc"; // unipolar
+}
+
+function drawWidget(ctx, col, rowY, cell) {
+  const kx = col * CELL_W + Math.floor((CELL_W - KW) / 2);
+  const style = widgetFor(cell);
+  if (style === "hbar") return drawHBar(ctx, kx, rowY, normOf(ctx, cell));
+  if (style === "vbar") return drawVBar(ctx, kx, rowY, normOf(ctx, cell));
+  if (style === "enumsq") return drawEnumSquare(ctx, kx, rowY, formatCell(ctx, cell).text, cell.sq ? cell.sq[getRaw(ctx, cell) - cell.min] : null);
+  if (style === "valsq") return drawValSquare(ctx, kx, rowY, formatCell(ctx, cell).text);
+  drawArcKnob(ctx, kx, rowY, normOf(ctx, cell), style === "arcbip");
+}
+
+/* Label strip cell: the param NAME normally; while that knob is touched the
+ * cell inverts and shows the live VALUE instead (movy's signature swap). */
+function drawLabelCell(ctx, col, lblY, cell, touched) {
+  const text = fitText(ctx, touched ? formatCell(ctx, cell).text : cell.label, CELL_W - 2);
+  const tw = ctx.measureText(text);
+  const tx = Math.round(col * CELL_W + CELL_W / 2 - tw / 2);
+  if (touched) {
+    ctx.fillRect(col * CELL_W, lblY, CELL_W, LBL_H, 1);
+    ctx.print(tx, lblY + 1, text, 0);
+  } else {
+    ctx.print(tx, lblY + 1, text, 1);
+  }
+}
+
+function dottedV(ctx, x, y0, y1) {
+  const lo = Math.min(y0, y1), hi = Math.max(y0, y1);
+  for (let y = lo; y <= hi; y += 2) ctx.setPixel(x, y, 1);
+}
+
+/* Full-width ADSR graphic across a widget row (movy envelope.ts): A drives the
+ * peak x, D the sustain-start x, S the plateau level, R the tail-end x, with a
+ * fixed gate-off reference so release is always visible. */
+function drawEnvelopeRow(ctx, rowY, cells) {
+  const nrm = (i) => (cells[i] ? normOf(ctx, cells[i]) : 0);
+  const a = nrm(0), d = nrm(1), s = nrm(2), r = nrm(3);
+  const baseY = rowY + 14, topY = rowY + 1;
+  const usableH = baseY - topY;
+  const gateX = 88;
+  const startX = 2;
+  const peakX = startX + Math.round(a * 26);
+  let sustStartX = peakX + 4 + Math.round(d * 24);
+  if (sustStartX > gateX - 2) sustStartX = gateX - 2;
+  const susY = baseY - Math.round(s * usableH);
+  let relEndX = gateX + 4 + Math.round(r * 33);
+  if (relEndX > ctx.width - 2) relEndX = ctx.width - 2;
+  plotLine(ctx, startX, baseY, peakX, topY, 1);       // attack rise
+  plotLine(ctx, peakX, topY, sustStartX, susY, 1);    // decay fall
+  plotLine(ctx, sustStartX, susY, gateX, susY, 1);    // sustain plateau
+  plotLine(ctx, gateX, susY, relEndX, baseY, 1);      // release fall
+  dottedV(ctx, sustStartX, susY, baseY);
+  dottedV(ctx, gateX, susY, baseY);
+  ctx.fillRect(Math.max(0, peakX - 1), topY, 2, 2, 1);
+  ctx.fillRect(sustStartX - 1, Math.max(rowY, susY - 1), 2, 2, 1);
+  ctx.fillRect(gateX - 1, Math.max(rowY, susY - 1), 2, 2, 1);
+  ctx.fillRect(Math.min(ctx.width - 2, relEndX - 1), baseY - 1, 2, 2, 1);
+}
+
+/* Scrolling option-list overlay while a >2-option enum cell is touched
+ * (movy drawEnumOverlay): covers the 3 columns away from the touched knob,
+ * selection centered + inverted. Toggles skip it (the hbar says it all). */
+function drawEnumOverlay(ctx, cells, s) {
+  const k = s.lastKnob;
+  const cell = k >= 0 ? cells[k] : null;
+  if (!cell || cell.kind !== "enum" || cell.options.length <= 2) return;
+  const sel = getRaw(ctx, cell) - cell.min;
+  const ovX = (k % 4) < 2 ? ctx.width - 3 * CELL_W : 0;
+  const ovW = 3 * CELL_W, ovY = ROW0_Y, ovH = LBL1_Y + LBL_H - ROW0_Y;
+  ctx.fillRect(ovX, ovY, ovW, ovH, 0);
+  ctx.drawRect(ovX, ovY, ovW, ovH, 1);
+  const ROW_H = 8, n = cell.options.length;
+  const VISIBLE = Math.min(n, Math.floor((ovH - 2) / ROW_H));
+  const half = Math.floor(VISIBLE / 2);
+  const start = Math.max(0, Math.min(sel - half, n - VISIBLE));
+  const listTop = ovY + Math.floor((ovH - VISIBLE * ROW_H) / 2);
+  for (let i = 0; i < VISIBLE; i++) {
+    const idx = start + i;
+    if (idx >= n) break;
+    const y = listTop + i * ROW_H;
+    if (idx === sel) {
+      ctx.fillRect(ovX + 2, y, ovW - 4, ROW_H, 1);
+      ctx.print(ovX + 4, y + 1, cell.options[idx], 0);
+    } else {
+      ctx.print(ovX + 4, y + 1, cell.options[idx], 1);
+    }
+  }
+  if (n > VISIBLE) {
+    const trackH = VISIBLE * ROW_H;
+    const thumbH = Math.max(3, Math.round(trackH * VISIBLE / n));
+    const thumbY = listTop + Math.round((trackH - thumbH) * start / Math.max(1, n - VISIBLE));
+    ctx.fillRect(ovX + ovW - 2, listTop, 1, trackH, 1);
+    ctx.fillRect(ovX + ovW - 3, thumbY, 2, thumbH, 1);
+  }
+}
+
+/* The per-bank frame: header + bank bar + two widget/label rows; env banks
+ * swap row 0's widgets for the full-width envelope graphic. */
+function drawBankView(ctx, bank, cells, s) {
   drawChrome(ctx, bank.label, s);
-  if (cells.length && cells.every((c) => c && c.kind === "fader")) return drawEnvGrid(ctx, cells, s);
-  if (cells.length <= 4) return drawRowGrid(ctx, cells, s);
-  const CELL_W = 32, COL_X0 = 0, ROW_Y0 = HDR_H + 1, ROW_GAP = 2;
-  const CELL_H = Math.floor(((CONTENT_BOT - 1) - ROW_Y0 + 1 - ROW_GAP) / 2);
-
-  // Grid lines framing the 2x4 cell grid: an outer border, 3 vertical column
-  // dividers, and the horizontal divider between the two rows.
-  const gLeft = 0, gRight = 128, gTop = ROW_Y0 - 1;
-  const rowDivY = ROW_Y0 + CELL_H;
-  const gBot = ROW_Y0 + 2 * CELL_H + ROW_GAP;
-  ctx.drawRect(gLeft, gTop, gRight - gLeft, gBot - gTop, 1);
-  for (let c = 1; c < 4; c++) {
-    ctx.fillRect(COL_X0 + c * CELL_W - 1, gTop, 1, gBot - gTop, 1);
+  drawBankBar(ctx, s.bank, BANKS.length);
+  if (bank.env) {
+    drawEnvelopeRow(ctx, ROW0_Y, cells);
+    for (let col = 0; col < 4; col++) {
+      if (cells[col]) drawLabelCell(ctx, col, LBL0_Y, cells[col], col === s.lastKnob);
+    }
+    for (let col = 0; col < 4; col++) {
+      const cell = cells[4 + col];
+      if (!cell) continue;
+      drawWidget(ctx, col, ROW1_Y, cell);
+      drawLabelCell(ctx, col, LBL1_Y, cell, (4 + col) === s.lastKnob);
+    }
+  } else {
+    for (let k = 0; k < 8; k++) {
+      const cell = cells[k];
+      if (!cell) continue;
+      const col = k % 4, rowY = k < 4 ? ROW0_Y : ROW1_Y, lblY = k < 4 ? LBL0_Y : LBL1_Y;
+      drawWidget(ctx, col, rowY, cell);
+      drawLabelCell(ctx, col, lblY, cell, k === s.lastKnob);
+    }
   }
-  ctx.fillRect(gLeft, rowDivY, gRight - gLeft, 1, 1);
-
-  // Each cell fills its framed column/row with a uniform 1px inset from every
-  // divider and border, so the touched-cell highlight sits evenly inside.
-  const colL = (c) => (c === 0 ? gLeft : COL_X0 + c * CELL_W - 1);
-  const colR = (c) => (c === 3 ? gRight - 1 : COL_X0 + (c + 1) * CELL_W - 1);
-  for (let k = 0; k < 8; k++) {
-    const cell = cells[k];
-    if (!cell) continue;
-    const col = k % 4, row = k < 4 ? 0 : 1;
-    const lx = colL(col), rx = colR(col);
-    const ty = row === 0 ? gTop : rowDivY, by = row === 0 ? rowDivY : gBot - 1;
-    drawCellBox(ctx, lx + 1, ty + 1, rx - lx - 1, by - ty - 1, cell.label, formatCell(ctx, cell), k === s.lastKnob);
-  }
+  drawEnumOverlay(ctx, cells, s);
 }
 
 /* ---- the overlay object ---- */
@@ -620,7 +771,7 @@ const bank_editor = {
 
     const s = readState(ctx);
     const bank = BANKS[s.bank];
-    drawGrid(ctx, bank, bank.knobs, s);
+    drawBankView(ctx, bank, bank.knobs, s);
     drawSectionNav(ctx, s);
   },
 
@@ -628,7 +779,8 @@ const bank_editor = {
     BANKS, JUMP_SECTIONS, activeSection, NAV_SENS,
     dirFromCC, clampBank, accumStep,
     formatCell, DEFAULTS, kToggleLabels, kLegatoLabels,
-    drawBankIcon, BANK_ICONS, ICON_W
+    drawBankIcon, BANK_ICONS, ICON_W,
+    widgetFor, enumSquareLines, pf3Width
   }
 };
 
