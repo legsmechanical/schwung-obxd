@@ -1,10 +1,10 @@
 /* ---- OB-Xd Bank Editor overlay ----
  * On-device canvas editor (loaded by the host as canvas.js#bank_editor),
  * rebuilt on the Echidna canvas chassis (schwung-echidna/src/canvas.js):
- * 5x5 pixel font, framed grid with per-kind cell rendering (bars /
- * center-detent bars / enums / faders), all-fader envelope banks, and a
- * SHIFT / jog-touch section-jump picker instead of the old bottom tab bar.
- * Jog turn (CC 14) cycles banks; knobs (CC 71-78) edit the active bank.
+ * 5x5 pixel font, movy-style widgets, and a SHIFT-held bank-picker overlay
+ * instead of the old bottom tab bar.
+ * Jog turn (CC 14) cycles banks (no overlay); SHIFT (CC 49) + jog shows the
+ * full bank list while scrolling; knobs (CC 71-78) edit the active bank.
  * Wrapped in an IIFE to keep top-level declarations scoped to this overlay. */
 (function () {
 
@@ -234,32 +234,9 @@ const BANKS = [
   { label: "Global", knobs: [uni("volume", "Vol"), bip("tune", "Tune"), oct("octave", "Oct", -2, 2), oct("octave_transpose", "Trsp", -3, 3), uni("portamento", "Port"), count("voice_count", "Vcs", 1, 8), enumc("legato", "Lgto", kLegatoLabels, ["RTG", "LG1", "LG2", "KEP"]), tog("as_played", "Play")] }
 ];
 
-/* Shift+jog jump targets — the section picker. A section "owns" every bank
- * from its target up to the next target (FILTER covers Filter + Filter Mode,
- * LFO covers LFO + LFO Dest). */
-/* Detents per step while scrolling the SHIFT section picker (slower than
- * plain jog bank-stepping, which stays 1:1). */
+/* Detents per step while scrolling the SHIFT bank picker (slower than plain
+ * jog bank-stepping, which stays 1:1). */
 const NAV_SENS = 2;
-
-const JUMP_SECTIONS = [
-  { name: "OSC 1", bank: 0 },
-  { name: "OSC 2", bank: 1 },
-  { name: "OSC COMMON", bank: 2 },
-  { name: "FILTER", bank: 3 },
-  { name: "FILTER ENV", bank: 5 },
-  { name: "AMP ENV", bank: 6 },
-  { name: "LFO", bank: 7 },
-  { name: "PITCH MOD", bank: 9 },
-  { name: "VOICE", bank: 10 },
-  { name: "PAN", bank: 11 },
-  { name: "GLOBAL", bank: 12 }
-];
-/* Which section the current bank falls under (the last target <= bankIdx). */
-function activeSection(bankIdx) {
-  let idx = 0;
-  for (let i = 0; i < JUMP_SECTIONS.length; i++) if (JUMP_SECTIONS[i].bank <= bankIdx) idx = i;
-  return idx;
-}
 
 /* ---- state / lifecycle ---- */
 
@@ -272,9 +249,8 @@ function readState(ctx) {
     s.bank = clampBank(v, BANKS.length);
     s.accum = [0, 0, 0, 0, 0, 0, 0, 0];
     s.lastKnob = -1;
-    s.shift = false;       // SHIFT button held (CC 15) -> section picker
-    s.jogTouch = false;    // jog-wheel capacitive touch (note 9) -> same picker, no hold
-    s.jogAccum = 0;        // shift+jog detent accumulator (slows the section picker)
+    s.shift = false;       // SHIFT button held (CC 49) -> bank-picker overlay
+    s.jogAccum = 0;        // shift+jog detent accumulator (slows the picker)
   }
   return s;
 }
@@ -410,14 +386,14 @@ function drawChrome(ctx, headerLabel, s) {
   if (icon) drawBankIcon(ctx, ctx.width - iw - 2, 1, icon);
 }
 
-/* Section-jump navigator — the transient overlay shown WHILE SHIFT is held
- * (or a finger rests on the jog wheel). Shift+jog moves the highlight
- * section-to-section; releasing shift leaves you in that section. Drawn on
- * top of whatever layout is underneath. */
-function drawSectionNav(ctx, s) {
-  if (!s.shift && !s.jogTouch) return;
-  const items = JUMP_SECTIONS;
-  const active = activeSection(s.bank);
+/* Bank-picker overlay — shown ONLY while SHIFT (CC 49) is held. One row per
+ * BANK (every page, not sections — the popup obscures the banks beneath, so
+ * it must list everything reachable). Shift+jog moves the highlight;
+ * releasing shift leaves you on that bank. Plain jog stays overlay-free. */
+function drawBankPicker(ctx, s) {
+  if (!s.shift) return;
+  const items = BANKS;
+  const active = s.bank;
   const x = 4, y = 2, w = ctx.width - 8, h = ctx.height - 4;
   ctx.fillRect(x, y, w, h, 0);   // clear the screen beneath
   ctx.drawRect(x, y, w, h, 1);   // popup frame
@@ -431,7 +407,7 @@ function drawSectionNav(ctx, s) {
     const ry = listY + r * rowH;
     const sel = i === active;
     if (sel) ctx.fillRect(x + 2, ry - 1, w - 6, rowH, 1);
-    ctx.print(x + 4, ry, items[i].name, sel ? 0 : 1);
+    ctx.print(x + 4, ry, items[i].label, sel ? 0 : 1);
   }
   // Right-edge scrollbar: track + a thumb sized/positioned to the window.
   const trackY = listY - 1, trackH = visible * rowH;
@@ -672,34 +648,28 @@ const bank_editor = {
     const s = readState(ctx);
     const status = d[0] & 0xF0;
 
-    if (status === 0x90 || status === 0x80) { // capacitive touch: notes 0-7 knobs, 9 jog
+    if (status === 0x90 || status === 0x80) { // capacitive touch: notes 0-7 knobs
       const note = d[1];
       if (note <= 7) s.lastKnob = (status === 0x90 && d[2] >= 64) ? note : -1;
-      // Jog-wheel touch (MoveMainTouch = 9): rest a finger on the jog to see
-      // the section-nav overlay (same picker as SHIFT, no hold needed).
-      if (note === 9) s.jogTouch = (status === 0x90 && d[2] >= 64);
       return;
     }
     if (status !== 0xB0) return;
     const cc = d[1], val = d[2];
 
-    if (cc === 15) { s.shift = val >= 64; s.jogAccum = 0; return; } // SHIFT hold: gates section-jump + the nav popup
+    // SHIFT (Move hardware CC 49 — NOT 15) hold: shows the bank-picker overlay
+    if (cc === 49) { s.shift = val >= 64; s.jogAccum = 0; return; }
 
-    if (cc === 14) { // jog turn
+    if (cc === 14) { // jog turn: steps banks either way; SHIFT adds the overlay
       const jd = dirFromCC(val);
       if (jd) {
         if (s.shift) {
-          // Shift+jog: step through the section picker, landing on that
-          // section's first bank. Accumulated (NAV_SENS detents per step)
-          // so scrolling the list is slower than plain bank stepping.
+          // Shift+jog scrolls the picker list a bit slower (NAV_SENS detents
+          // per step); plain jog stays 1:1 with no overlay.
           const nr = accumStep(s.jogAccum, jd, NAV_SENS);
           s.jogAccum = nr.accum;
           if (!nr.fire) return;
-          const ni = clampBank(activeSection(s.bank) + jd, JUMP_SECTIONS.length);
-          s.bank = JUMP_SECTIONS[ni].bank;
-        } else {
-          s.bank = clampBank(s.bank + jd, BANKS.length);
         }
+        s.bank = clampBank(s.bank + jd, BANKS.length);
         ctx.setValue(String(s.bank));  // persist for re-open
         s.lastKnob = -1;
       }
@@ -760,11 +730,11 @@ const bank_editor = {
     const s = readState(ctx);
     const bank = BANKS[s.bank];
     drawBankView(ctx, bank, bank.knobs, s);
-    drawSectionNav(ctx, s);
+    drawBankPicker(ctx, s);
   },
 
   _test: {
-    BANKS, JUMP_SECTIONS, activeSection, NAV_SENS,
+    BANKS, NAV_SENS,
     dirFromCC, clampBank, accumStep,
     formatCell, DEFAULTS, kToggleLabels, kLegatoLabels,
     drawBankIcon, BANK_ICONS, ICON_W,

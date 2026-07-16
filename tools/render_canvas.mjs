@@ -20,7 +20,7 @@ function makeCtx(init = {}) {
   const fb = new Uint8Array(W * H); // 0/1 per pixel
   const px = (x, y, v) => { x |= 0; y |= 0; if (x >= 0 && x < W && y >= 0 && y < H) fb[y * W + x] = v ? 1 : 0; };
   return {
-    fb, width: W, height: H, state: { init: true, bank: 0, lastKnob: -1, accum: [0, 0, 0, 0, 0, 0, 0, 0], shift: false, jogTouch: false },
+    fb, width: W, height: H, state: { init: true, bank: 0, lastKnob: -1, accum: [0, 0, 0, 0, 0, 0, 0, 0], shift: false, jogAccum: 0 },
     getParam(k) { return Object.prototype.hasOwnProperty.call(store, k) ? String(store[k]) : null; },
     setParam(k, v) { store[k] = parseInt(v, 10); },
     getValue: () => "0", setValue: () => {},
