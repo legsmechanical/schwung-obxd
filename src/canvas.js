@@ -33,14 +33,6 @@ function accumStep(accum, dir, sens) {
   return { accum: accum, fire: false };
 }
 
-/* Wrapping increment for enum cells (Off->On->Off, Retrig->...->Keep->Retrig). */
-function wrapInc(cur, dir, n) {
-  if (n <= 0) return 0;
-  var v = (cur + dir) % n;
-  if (v < 0) v += n;
-  return v;
-}
-
 /* ---- mcufont: 5x5 monospace bitmap font (ported from the Echidna canvas,
  * itself from schwung-davebox assets/fonts/mcufont.h) ----
  * Rendered as flat 1-bit pixels via ctx.setPixel; draw() overrides
@@ -146,11 +138,14 @@ const DEFAULTS = {
   pan_5: 50, pan_6: 50, pan_7: 50, pan_8: 50
 };
 
-/* ---- cell descriptor constructors (native-int chain contract) ---- */
+/* ---- cell descriptor constructors (native-int chain contract) ----
+ * Enum cells step slower (sens 3) than continuous ones and CLAMP at their
+ * ends rather than wrapping — an accidental extra detent shouldn't flip
+ * On back to Off or jump Keep back to Rtrg. */
 function uni(key, label) { return { key, label, kind: "unipolar", min: 0, max: 100, step: 1, sens: 2 }; }
 function bip(key, label) { return { key, label, kind: "bipolar", min: 0, max: 100, step: 1, sens: 2, dflt: 50 }; }
-function tog(key, label) { return { key, label, kind: "enum", min: 0, max: 1, options: kToggleLabels }; }
-function enumc(key, label, options) { return { key, label, kind: "enum", min: 0, max: options.length - 1, options }; }
+function tog(key, label) { return { key, label, kind: "enum", min: 0, max: 1, step: 1, sens: 3, options: kToggleLabels }; }
+function enumc(key, label, options) { return { key, label, kind: "enum", min: 0, max: options.length - 1, step: 1, sens: 3, options }; }
 function oct(key, label, lo, hi) { return { key, label, kind: "octave", min: lo, max: hi, step: 1, sens: 3 }; }
 function count(key, label, lo, hi) { return { key, label, kind: "count", min: lo, max: hi, step: 1, sens: 3 }; }
 function fader(key, label) { return { key, label, kind: "fader", min: 0, max: 100, step: 1, sens: 2 }; }
@@ -179,6 +174,10 @@ const BANKS = [
 /* Shift+jog jump targets — the section picker. A section "owns" every bank
  * from its target up to the next target (FILTER covers Filter + Filter Mode,
  * LFO covers LFO + LFO Dest). */
+/* Detents per step while scrolling the SHIFT section picker (slower than
+ * plain jog bank-stepping, which stays 1:1). */
+const NAV_SENS = 2;
+
 const JUMP_SECTIONS = [
   { name: "OSC 1", bank: 0 },
   { name: "OSC 2", bank: 1 },
@@ -212,6 +211,7 @@ function readState(ctx) {
     s.lastKnob = -1;
     s.shift = false;       // SHIFT button held (CC 15) -> section picker
     s.jogTouch = false;    // jog-wheel capacitive touch (note 9) -> same picker, no hold
+    s.jogAccum = 0;        // shift+jog detent accumulator (slows the section picker)
   }
   return s;
 }
@@ -544,14 +544,18 @@ const bank_editor = {
     if (status !== 0xB0) return;
     const cc = d[1], val = d[2];
 
-    if (cc === 15) { s.shift = val >= 64; return; } // SHIFT hold: gates section-jump + the nav popup
+    if (cc === 15) { s.shift = val >= 64; s.jogAccum = 0; return; } // SHIFT hold: gates section-jump + the nav popup
 
     if (cc === 14) { // jog turn
       const jd = dirFromCC(val);
       if (jd) {
         if (s.shift) {
           // Shift+jog: step through the section picker, landing on that
-          // section's first bank. Plain jog (below) still steps every bank.
+          // section's first bank. Accumulated (NAV_SENS detents per step)
+          // so scrolling the list is slower than plain bank stepping.
+          const nr = accumStep(s.jogAccum, jd, NAV_SENS);
+          s.jogAccum = nr.accum;
+          if (!nr.fire) return;
           const ni = clampBank(activeSection(s.bank) + jd, JUMP_SECTIONS.length);
           s.bank = JUMP_SECTIONS[ni].bank;
         } else {
@@ -571,18 +575,8 @@ const bank_editor = {
     if (!cell) return;                  // empty slot on this bank
     s.lastKnob = k;
 
-    if (cell.kind === "enum") {
-      const res = accumStep(s.accum[k], dir, 2);
-      s.accum[k] = res.accum;
-      if (!res.fire) return;
-      const cur = parseInt(ctx.getParam(cell.key) || String(cell.min), 10);
-      const n = cell.max - cell.min + 1;
-      const nv = cell.min + wrapInc((isNaN(cur) ? cell.min : cur) - cell.min, dir, n);
-      if (nv !== cur) ctx.setParam(cell.key, String(nv));
-      return;
-    }
-    // unipolar / bipolar / octave / count / fader: clamp; accumulate
-    // cell.sens detents per step (knob feel + fewer blocking writes).
+    // All kinds (incl. enum) step-and-CLAMP; accumulate cell.sens detents
+    // per step (knob feel + fewer blocking writes).
     const cr = accumStep(s.accum[k], dir, cell.sens || 2);
     s.accum[k] = cr.accum;
     if (!cr.fire) return;
@@ -631,8 +625,8 @@ const bank_editor = {
   },
 
   _test: {
-    BANKS, JUMP_SECTIONS, activeSection,
-    dirFromCC, clampBank, accumStep, wrapInc,
+    BANKS, JUMP_SECTIONS, activeSection, NAV_SENS,
+    dirFromCC, clampBank, accumStep,
     formatCell, DEFAULTS, kToggleLabels, kLegatoLabels,
     drawBankIcon, BANK_ICONS, ICON_W
   }

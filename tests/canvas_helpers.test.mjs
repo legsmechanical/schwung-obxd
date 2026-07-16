@@ -36,11 +36,34 @@ eq(T.accumStep(0, 1, 2), { accum: 1, fire: false }, "accum first tick no fire");
 eq(T.accumStep(1, 1, 2), { accum: 0, fire: true }, "accum second tick fires+resets");
 eq(T.accumStep(1, -1, 2), { accum: -1, fire: false }, "accum reversal resets then counts");
 
-// wrapInc: wrapping increment for enum cells
-eq(T.wrapInc(0, 1, 2), 1, "wrapInc up");
-eq(T.wrapInc(1, 1, 2), 0, "wrapInc wraps high->0");
-eq(T.wrapInc(0, -1, 4), 3, "wrapInc wraps low->last");
-eq(T.wrapInc(3, -1, 4), 2, "wrapInc down");
+// enum cells: slower sens than continuous, and clamp (no wrap) at the ends —
+// exercised through onMidi with a stub ctx (CC 71 = knob 1, d2 1 = CW, 127 = CCW).
+{
+  const be = globalThis.bank_editor;
+  const store = Object.assign({}, T.DEFAULTS);
+  const ctx = {
+    state: {},
+    getParam: (k) => String(store[k]),
+    setParam: (k, v) => { store[k] = parseInt(v, 10); },
+    getValue: () => "12", setValue: () => {}   // bank 12 = Global (legato on knob 7)
+  };
+  be.onOpen(ctx);
+  const turn = (cc, d2) => be.onMidi(ctx, { data: [0xB0, cc, d2] });
+  const legato = T.BANKS[12].knobs.find((c) => c.key === "legato");
+  eq(legato.sens, 3, "enum sens is 3 (slower than continuous 2)");
+  store.legato = 0;
+  turn(77, 1); turn(77, 1);
+  eq(store.legato, 0, "enum: 2 detents don't fire at sens 3");
+  turn(77, 1);
+  eq(store.legato, 1, "enum: 3rd detent fires");
+  store.legato = 3;
+  turn(77, 1); turn(77, 1); turn(77, 1);
+  eq(store.legato, 3, "enum clamps at max (no wrap to 0)");
+  store.unison = 0; // Voice bank knob 1 — but stay on Global: as_played knob 8
+  store.as_played = 0;
+  turn(78, 127); turn(78, 127); turn(78, 127);
+  eq(store.as_played, 0, "toggle clamps at min (no wrap to On)");
+}
 
 // activeSection: the last JUMP_SECTIONS target <= bankIdx
 eq(T.activeSection(0), 0, "activeSection first bank");
