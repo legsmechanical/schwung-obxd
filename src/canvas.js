@@ -256,6 +256,16 @@ const JUMP_SECTIONS = [
   { name: "PAN", bank: 11 },
   { name: "GLOBAL", bank: 12 }
 ];
+/* Is SHIFT held? On device the shim does NOT forward CC 49 to shadow_ui in
+ * chain-edit (its CC allowlist is 14/3/51/40-43/71-78/88), but it DOES sync
+ * shift into SHM, and shadow_ui exposes it to this QuickJS context as
+ * shadow_get_shift_held(). Poll that; fall back to CC-49 tracking (s.shift)
+ * off-device (previewer/tests) — where the binding doesn't exist. */
+function shiftHeld(s) {
+  if (typeof shadow_get_shift_held === "function") return !!shadow_get_shift_held();
+  return s.shift;
+}
+
 /* Which section the current bank falls under (the last target <= bankIdx). */
 function activeSection(bankIdx) {
   let idx = 0;
@@ -274,7 +284,7 @@ function readState(ctx) {
     s.bank = clampBank(v, BANKS.length);
     s.accum = [0, 0, 0, 0, 0, 0, 0, 0];
     s.lastKnob = -1;
-    s.shift = false;       // SHIFT button held (CC 49) -> bank-picker overlay
+    s.shift = false;       // SHIFT fallback state (CC 49) for off-device runs
     s.jogAccum = 0;        // shift+jog detent accumulator (slows the picker)
   }
   return s;
@@ -416,7 +426,7 @@ function drawChrome(ctx, headerLabel, s) {
  * Shift+jog moves the highlight; releasing shift leaves you on that
  * section's first bank. */
 function drawBankPicker(ctx, s) {
-  if (!s.shift) return;
+  if (!shiftHeld(s)) return;
   const items = JUMP_SECTIONS;
   const active = activeSection(s.bank);
   const x = 4, y = 2, w = ctx.width - 8, h = ctx.height - 4;
@@ -681,13 +691,14 @@ const bank_editor = {
     if (status !== 0xB0) return;
     const cc = d[1], val = d[2];
 
-    // SHIFT (Move hardware CC 49 — NOT 15) hold: shows the bank-picker overlay
+    // CC-49 fallback for off-device runs; on device shift arrives via the
+    // shadow_get_shift_held() SHM poll (the shim doesn't forward CC 49 here).
     if (cc === 49) { s.shift = val >= 64; s.jogAccum = 0; return; }
 
     if (cc === 14) { // jog turn: steps banks either way; SHIFT adds the overlay
       const jd = dirFromCC(val);
       if (jd) {
-        if (s.shift) {
+        if (shiftHeld(s)) {
           // Shift+jog: step the picker section-to-section (NAV_SENS detents
           // per step), landing on that section's first bank. Plain jog stays
           // 1:1 through every bank with no overlay.
@@ -697,6 +708,7 @@ const bank_editor = {
           const ni = clampBank(activeSection(s.bank) + jd, JUMP_SECTIONS.length);
           s.bank = JUMP_SECTIONS[ni].bank;
         } else {
+          s.jogAccum = 0;
           s.bank = clampBank(s.bank + jd, BANKS.length);
         }
         ctx.setValue(String(s.bank));  // persist for re-open
@@ -763,7 +775,7 @@ const bank_editor = {
   },
 
   _test: {
-    BANKS, JUMP_SECTIONS, activeSection, NAV_SENS,
+    BANKS, JUMP_SECTIONS, activeSection, NAV_SENS, shiftHeld,
     dirFromCC, clampBank, accumStep,
     formatCell, DEFAULTS, kToggleLabels, kLegatoLabels,
     drawBankIcon, BANK_ICONS, ICON_W,

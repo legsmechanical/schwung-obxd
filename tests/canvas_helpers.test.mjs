@@ -100,6 +100,16 @@ eq(T.accumStep(1, -1, 2), { accum: -1, fire: false }, "accum reversal resets the
   ctx.state.bank = T.BANKS.length - 1;
   midi(14, 1);
   eq(ctx.state.bank, T.BANKS.length - 1, "plain jog clamps at last bank");
+
+  // On-device path: shift comes from the shadow_get_shift_held() SHM binding
+  // (the shim never forwards CC 49 to shadow_ui in chain-edit), overriding
+  // the CC-49 fallback state.
+  globalThis.shadow_get_shift_held = () => 1;
+  ctx.state.bank = 3;                  // Filter
+  ctx.state.jogAccum = 0;
+  midi(14, 1); midi(14, 1);
+  eq(ctx.state.bank, 5, "SHM shift (no CC 49) drives section jump");
+  delete globalThis.shadow_get_shift_held;
 }
 
 // formatCell: per-kind text/bar resolution (fed by a stub ctx over DEFAULTS)
