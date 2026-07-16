@@ -65,31 +65,41 @@ eq(T.accumStep(1, -1, 2), { accum: -1, fire: false }, "accum reversal resets the
   eq(store.as_played, 0, "toggle clamps at min (no wrap to On)");
 }
 
-// SHIFT (CC 49) + jog: overlay picker steps banks at NAV_SENS detents/step;
-// plain jog steps 1:1. Both clamp at the ends.
+// activeSection: the last JUMP_SECTIONS target <= bankIdx
+{
+  const secs = T.JUMP_SECTIONS;
+  eq(T.activeSection(0), 0, "activeSection first bank");
+  eq(T.activeSection(T.BANKS.length - 1), secs.length - 1, "activeSection last bank");
+  const fm = T.BANKS.findIndex((b) => b.label === "Filter Mode");
+  const flt = secs.findIndex((sec) => sec.name === "FILTER");
+  eq(T.activeSection(fm), flt, "activeSection owned bank (Filter Mode -> FILTER)");
+}
+
+// Jog paradigm: plain jog steps EVERY bank 1:1 (no overlay); SHIFT (CC 49) +
+// jog jumps section-to-section at NAV_SENS detents/step. Both clamp.
 {
   const be = globalThis.bank_editor;
   const ctx = {
     state: {},
     getParam: () => "0", setParam: () => {},
-    getValue: () => "5", setValue: () => {}
+    getValue: () => "3", setValue: () => {}   // bank 3 = Filter
   };
   be.onOpen(ctx);
   const midi = (cc, d2) => be.onMidi(ctx, { data: [0xB0, cc, d2] });
-  eq(ctx.state.bank, 5, "opens on persisted bank");
+  eq(ctx.state.bank, 3, "opens on persisted bank");
   midi(14, 1);
-  eq(ctx.state.bank, 6, "plain jog steps 1:1");
+  eq(ctx.state.bank, 4, "plain jog steps 1:1 (Filter -> Filter Mode)");
   midi(49, 127);                       // SHIFT down (CC 49, the real Move shift)
   eq(ctx.state.shift, true, "shift registers on CC 49");
   midi(14, 1);
-  eq(ctx.state.bank, 6, "shift+jog: first detent doesn't step (NAV_SENS 2)");
+  eq(ctx.state.bank, 4, "shift+jog: first detent doesn't step (NAV_SENS 2)");
   midi(14, 1);
-  eq(ctx.state.bank, 7, "shift+jog: second detent steps");
+  eq(ctx.state.bank, 5, "shift+jog: 2nd detent jumps to next SECTION (Filter Env)");
   midi(49, 0);                         // SHIFT up
   eq(ctx.state.shift, false, "shift releases");
   ctx.state.bank = T.BANKS.length - 1;
   midi(14, 1);
-  eq(ctx.state.bank, T.BANKS.length - 1, "jog clamps at last bank");
+  eq(ctx.state.bank, T.BANKS.length - 1, "plain jog clamps at last bank");
 }
 
 // formatCell: per-kind text/bar resolution (fed by a stub ctx over DEFAULTS)

@@ -68,10 +68,18 @@ for (const label of ["Filter Env", "Amp Env"]) {
   if (!b.knobs.every((c) => c.kind === "fader")) fail(`${label} not all-fader`);
 }
 
-// Bank labels must fit the picker overlay's usable row width (one row per
-// bank; x+4 text start, 6px/char 5x5 font, scrollbar at the right edge).
-for (const b of BANKS) {
-  if (b.label.length * 6 - 1 > 108) fail(`bank label too wide for picker: ${b.label}`);
+// JUMP_SECTIONS: strictly ascending bank targets, all in range, first at 0;
+// names must fit the picker overlay's usable row width.
+{
+  const secs = T.JUMP_SECTIONS;
+  if (secs[0].bank !== 0) fail("JUMP_SECTIONS must start at bank 0");
+  for (let i = 0; i < secs.length; i++) {
+    const t = secs[i].bank;
+    if (t < 0 || t >= BANKS.length) fail(`section ${secs[i].name} target out of range`);
+    if (i > 0 && t <= secs[i - 1].bank) fail(`section ${secs[i].name} not ascending`);
+    if (!secs[i].name) fail(`section ${i} missing name`);
+    if (secs[i].name.length * 6 - 1 > 108) fail(`section name too wide for picker: ${secs[i].name}`);
+  }
 }
 
 // Every bank has an icon with a registered width.

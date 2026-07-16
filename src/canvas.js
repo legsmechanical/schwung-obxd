@@ -1,10 +1,11 @@
 /* ---- OB-Xd Bank Editor overlay ----
  * On-device canvas editor (loaded by the host as canvas.js#bank_editor),
  * rebuilt on the Echidna canvas chassis (schwung-echidna/src/canvas.js):
- * 5x5 pixel font, movy-style widgets, and a SHIFT-held bank-picker overlay
- * instead of the old bottom tab bar.
- * Jog turn (CC 14) cycles banks (no overlay); SHIFT (CC 49) + jog shows the
- * full bank list while scrolling; knobs (CC 71-78) edit the active bank.
+ * 5x5 pixel font, movy-style widgets, and a SHIFT-held section-picker
+ * overlay instead of the old bottom tab bar.
+ * Jog turn (CC 14) cycles banks page-by-page (no overlay); SHIFT (CC 49) +
+ * jog jumps section-to-section with the picker overlay shown while held;
+ * knobs (CC 71-78) edit the active bank.
  * Wrapped in an IIFE to keep top-level declarations scoped to this overlay. */
 (function () {
 
@@ -234,9 +235,33 @@ const BANKS = [
   { label: "Global", knobs: [uni("volume", "Vol"), bip("tune", "Tune"), oct("octave", "Oct", -2, 2), oct("octave_transpose", "Trsp", -3, 3), uni("portamento", "Port"), count("voice_count", "Vcs", 1, 8), enumc("legato", "Lgto", kLegatoLabels, ["RTG", "LG1", "LG2", "KEP"]), tog("as_played", "Play")] }
 ];
 
-/* Detents per step while scrolling the SHIFT bank picker (slower than plain
- * jog bank-stepping, which stays 1:1). */
+/* Detents per step while scrolling the SHIFT section picker (slower than
+ * plain jog bank-stepping, which stays 1:1). */
 const NAV_SENS = 2;
+
+/* Shift+jog jump targets — the section picker. Plain jog steps every bank
+ * overlay-free (each page is visible as you pass it), so the picker stays
+ * coarse: one row per section, a section "owning" every bank from its target
+ * up to the next (FILTER covers Filter + Filter Mode, LFO covers LFO Dest). */
+const JUMP_SECTIONS = [
+  { name: "OSC 1", bank: 0 },
+  { name: "OSC 2", bank: 1 },
+  { name: "OSC COMMON", bank: 2 },
+  { name: "FILTER", bank: 3 },
+  { name: "FILTER ENV", bank: 5 },
+  { name: "AMP ENV", bank: 6 },
+  { name: "LFO", bank: 7 },
+  { name: "PITCH MOD", bank: 9 },
+  { name: "VOICE", bank: 10 },
+  { name: "PAN", bank: 11 },
+  { name: "GLOBAL", bank: 12 }
+];
+/* Which section the current bank falls under (the last target <= bankIdx). */
+function activeSection(bankIdx) {
+  let idx = 0;
+  for (let i = 0; i < JUMP_SECTIONS.length; i++) if (JUMP_SECTIONS[i].bank <= bankIdx) idx = i;
+  return idx;
+}
 
 /* ---- state / lifecycle ---- */
 
@@ -386,14 +411,14 @@ function drawChrome(ctx, headerLabel, s) {
   if (icon) drawBankIcon(ctx, ctx.width - iw - 2, 1, icon);
 }
 
-/* Bank-picker overlay — shown ONLY while SHIFT (CC 49) is held. One row per
- * BANK (every page, not sections — the popup obscures the banks beneath, so
- * it must list everything reachable). Shift+jog moves the highlight;
- * releasing shift leaves you on that bank. Plain jog stays overlay-free. */
+/* Section-picker overlay — shown ONLY while SHIFT (CC 49) is held. One row
+ * per SECTION (coarse jumps; plain jog browses the pages overlay-free).
+ * Shift+jog moves the highlight; releasing shift leaves you on that
+ * section's first bank. */
 function drawBankPicker(ctx, s) {
   if (!s.shift) return;
-  const items = BANKS;
-  const active = s.bank;
+  const items = JUMP_SECTIONS;
+  const active = activeSection(s.bank);
   const x = 4, y = 2, w = ctx.width - 8, h = ctx.height - 4;
   ctx.fillRect(x, y, w, h, 0);   // clear the screen beneath
   ctx.drawRect(x, y, w, h, 1);   // popup frame
@@ -407,7 +432,7 @@ function drawBankPicker(ctx, s) {
     const ry = listY + r * rowH;
     const sel = i === active;
     if (sel) ctx.fillRect(x + 2, ry - 1, w - 6, rowH, 1);
-    ctx.print(x + 4, ry, items[i].label, sel ? 0 : 1);
+    ctx.print(x + 4, ry, items[i].name, sel ? 0 : 1);
   }
   // Right-edge scrollbar: track + a thumb sized/positioned to the window.
   const trackY = listY - 1, trackH = visible * rowH;
@@ -663,13 +688,17 @@ const bank_editor = {
       const jd = dirFromCC(val);
       if (jd) {
         if (s.shift) {
-          // Shift+jog scrolls the picker list a bit slower (NAV_SENS detents
-          // per step); plain jog stays 1:1 with no overlay.
+          // Shift+jog: step the picker section-to-section (NAV_SENS detents
+          // per step), landing on that section's first bank. Plain jog stays
+          // 1:1 through every bank with no overlay.
           const nr = accumStep(s.jogAccum, jd, NAV_SENS);
           s.jogAccum = nr.accum;
           if (!nr.fire) return;
+          const ni = clampBank(activeSection(s.bank) + jd, JUMP_SECTIONS.length);
+          s.bank = JUMP_SECTIONS[ni].bank;
+        } else {
+          s.bank = clampBank(s.bank + jd, BANKS.length);
         }
-        s.bank = clampBank(s.bank + jd, BANKS.length);
         ctx.setValue(String(s.bank));  // persist for re-open
         s.lastKnob = -1;
       }
@@ -734,7 +763,7 @@ const bank_editor = {
   },
 
   _test: {
-    BANKS, NAV_SENS,
+    BANKS, JUMP_SECTIONS, activeSection, NAV_SENS,
     dirFromCC, clampBank, accumStep,
     formatCell, DEFAULTS, kToggleLabels, kLegatoLabels,
     drawBankIcon, BANK_ICONS, ICON_W,
