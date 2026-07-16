@@ -445,25 +445,14 @@ function drawSectionNav(ctx, s) {
 /* ---- movy-style widget renderers (ported/adapted from schwung-movy
  * src/renderer/{knob,envelope,label,header,overlay}.ts, MIT (c) 2026 megadake)
  * — the hybrid experiment: movy's Elektron-ish widget language (arc knobs,
- * bar toggles, framed enum/value squares, name<->value label swap, segmented
- * bank bar, full-row ADSR graphic, enum list overlay) driven by OUR bank
- * model, header/icons, and SHIFT/jog-touch section picker. ---- */
+ * bar toggles, framed enum/value squares, name<->value label swap, full-row
+ * ADSR graphic, enum list overlay) driven by OUR bank model, header/icons,
+ * and SHIFT/jog-touch section picker. ---- */
 
-/* Layout: 9px inverted header, 2px bank bar, then two 16px widget rows each
- * with a 7px label strip beneath. */
-const BAR_Y = 10, ROW0_Y = 13, LBL0_Y = 29, ROW1_Y = 37, LBL1_Y = 53;
+/* Layout: 9px inverted header, then two 16px widget rows each with a 7px
+ * label strip beneath. */
+const ROW0_Y = 12, LBL0_Y = 28, ROW1_Y = 38, LBL1_Y = 54;
 const CELL_W = 32, KW = 16, LBL_H = 7;
-
-/* Segmented bank-position bar: one segment per bank, the active one 2px tall.
- * Always-on "you are here" glance; the SHIFT picker stays the jump tool. */
-function drawBankBar(ctx, active, count) {
-  const segW = Math.floor((ctx.width - (count - 1)) / count);
-  for (let b = 0; b < count; b++) {
-    const sx = b * (segW + 1);
-    const sw = b === count - 1 ? ctx.width - sx : segW;
-    ctx.fillRect(sx, BAR_Y, sw, b === active ? 2 : 1, 1);
-  }
-}
 
 function drawCircleBorder(ctx, cx, cy, r) {
   let x = r, y = 0, err = 0;
@@ -642,11 +631,10 @@ function drawEnumOverlay(ctx, cells, s) {
   }
 }
 
-/* The per-bank frame: header + bank bar + two widget/label rows; env banks
- * swap row 0's widgets for the full-width envelope graphic. */
+/* The per-bank frame: header + two widget/label rows; env banks swap row 0's
+ * widgets for the full-width envelope graphic. */
 function drawBankView(ctx, bank, cells, s) {
   drawChrome(ctx, bank.label, s);
-  drawBankBar(ctx, s.bank, BANKS.length);
   if (bank.env) {
     drawEnvelopeRow(ctx, ROW0_Y, cells);
     for (let col = 0; col < 4; col++) {
