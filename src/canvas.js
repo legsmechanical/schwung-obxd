@@ -350,8 +350,8 @@ function plotLine(ctx, x1, y1, x2, y2, fg) {
   }
 }
 
-function drawBankIcon(ctx, x, y, icon) {
-  const fg = 0; // black on the white header
+function drawBankIcon(ctx, x, y, icon, fg) {
+  fg = fg ? 1 : 0;
   if (icon === "sawpulse") {
     // a saw tooth next to a pulse wave (Echidna's Oscillators glyph)
     plotLine(ctx, x, y + 6, x + 4, y, fg); plotLine(ctx, x + 4, y, x + 4, y + 6, fg);
@@ -415,10 +415,7 @@ function drawBankIcon(ctx, x, y, icon) {
 
 function drawChrome(ctx, headerLabel, s) {
   ctx.fillRect(0, 0, ctx.width, HDR_H, 1);
-  const icon = BANK_ICONS[s.bank];
-  const iw = icon ? ICON_W[icon] : 0;
-  ctx.print(2, 1, fitText(ctx, headerLabel, ctx.width - 4 - (iw ? iw + 3 : 0)), 0);
-  if (icon) drawBankIcon(ctx, ctx.width - iw - 2, 1, icon);
+  ctx.print(2, 1, fitText(ctx, headerLabel, ctx.width - 4), 0);
 }
 
 /* Section-picker overlay — shown ONLY while SHIFT (CC 49) is held. One row
@@ -443,6 +440,8 @@ function drawBankPicker(ctx, s) {
     const sel = i === active;
     if (sel) ctx.fillRect(x + 2, ry - 1, w - 6, rowH, 1);
     ctx.print(x + 4, ry, items[i].name, sel ? 0 : 1);
+    const icon = BANK_ICONS[items[i].bank];
+    if (icon) drawBankIcon(ctx, x + w - ICON_W[icon] - 7, ry, icon, sel ? 0 : 1);
   }
   // Right-edge scrollbar: track + a thumb sized/positioned to the window.
   const trackY = listY - 1, trackH = visible * rowH;
@@ -460,10 +459,11 @@ function drawBankPicker(ctx, s) {
  * ADSR graphic, enum list overlay) driven by OUR bank model, header/icons,
  * and SHIFT/jog-touch section picker. ---- */
 
-/* Layout: 9px inverted header, then two 16px widget rows each with a 7px
- * label strip beneath. */
-const ROW0_Y = 12, LBL0_Y = 28, ROW1_Y = 38, LBL1_Y = 54;
-const CELL_W = 32, KW = 16, LBL_H = 7;
+/* Layout: 9px inverted header (label only — icons live on the picker), then
+ * two 19px widget rows each with a 7px label strip beneath, filling the full
+ * 64 rows for bigger, clearer widgets. */
+const ROW0_Y = 11, LBL0_Y = 31, ROW1_Y = 39, LBL1_Y = 58;
+const CELL_W = 32, KW = 20, KH = 19, LBL_H = 7;
 
 function drawCircleBorder(ctx, cx, cy, r) {
   let x = r, y = 0, err = 0;
@@ -482,7 +482,7 @@ function drawCircleBorder(ctx, cx, cy, r) {
  * Bipolar cells get a 12-o'clock center tick inside the dial so the neutral
  * position reads (pan center, tune 0). */
 function drawArcKnob(ctx, kx, ky, norm, bipolar) {
-  const cx = kx + 7, cy = ky + 7, r = 7;
+  const cx = kx + 10, cy = ky + 9, r = 9;
   drawCircleBorder(ctx, cx, cy, r);
   if (bipolar) ctx.fillRect(cx, cy - r + 1, 1, 2, 1);
   const rad = (210 + norm * 300) * Math.PI / 180;
@@ -493,32 +493,32 @@ function drawArcKnob(ctx, kx, ky, norm, bipolar) {
 
 /* Horizontal bar filling left->right — the movy binary widget (toggles). */
 function drawHBar(ctx, kx, ky, norm) {
-  ctx.fillRect(kx + 1, ky + 5, 14, 1, 1);
-  ctx.fillRect(kx + 1, ky + 10, 14, 1, 1);
-  ctx.fillRect(kx + 1, ky + 5, 1, 6, 1);
-  ctx.fillRect(kx + 14, ky + 5, 1, 6, 1);
-  const fillW = Math.round(norm * 12);
-  if (fillW > 0) ctx.fillRect(kx + 2, ky + 6, fillW, 4, 1);
+  ctx.fillRect(kx + 1, ky + 6, 18, 1, 1);
+  ctx.fillRect(kx + 1, ky + 12, 18, 1, 1);
+  ctx.fillRect(kx + 1, ky + 6, 1, 7, 1);
+  ctx.fillRect(kx + 18, ky + 6, 1, 7, 1);
+  const fillW = Math.round(norm * 16);
+  if (fillW > 0) ctx.fillRect(kx + 2, ky + 7, fillW, 5, 1);
 }
 
 /* Vertical bar filling bottom->up — mix/level feel (env Vel cells). */
 function drawVBar(ctx, kx, ky, norm) {
-  ctx.fillRect(kx + 5, ky + 1, 6, 1, 1);
-  ctx.fillRect(kx + 5, ky + 14, 6, 1, 1);
-  ctx.fillRect(kx + 5, ky + 1, 1, 14, 1);
-  ctx.fillRect(kx + 10, ky + 1, 1, 14, 1);
-  const fillH = Math.round(norm * 12);
-  if (fillH > 0) ctx.fillRect(kx + 6, ky + 2 + (12 - fillH), 4, fillH, 1);
+  ctx.fillRect(kx + 6, ky + 1, 8, 1, 1);
+  ctx.fillRect(kx + 6, ky + 17, 8, 1, 1);
+  ctx.fillRect(kx + 6, ky + 1, 1, 17, 1);
+  ctx.fillRect(kx + 13, ky + 1, 1, 17, 1);
+  const fillH = Math.round(norm * 15);
+  if (fillH > 0) ctx.fillRect(kx + 7, ky + 2 + (15 - fillH), 6, fillH, 1);
 }
 
 /* 16x16 framed square with the enum value as up to two 3-char 5x3 lines
  * (or a single provided square label). */
 function drawEnumSquare(ctx, kx, ky, text, sqText) {
-  ctx.drawRect(kx, ky, KW, KW, 1);
+  ctx.drawRect(kx, ky, KW, KH, 1);
   const lines = sqText != null ? [String(sqText), ""] : enumSquareLines(text);
   const inner = KW - 2;
   const totalH = lines[1].length > 0 ? 11 : 5;
-  const startY = ky + 1 + Math.floor((inner - totalH) / 2);
+  const startY = ky + 1 + Math.floor((KH - 2 - totalH) / 2);
   const w1 = pf3Width(lines[0]);
   pf3Print(ctx, kx + 1 + Math.floor((inner - w1) / 2), startY, lines[0], 1);
   if (lines[1].length > 0) {
@@ -529,9 +529,9 @@ function drawEnumSquare(ctx, kx, ky, text, sqText) {
 
 /* 16x16 framed square with a single centered 5x3 value ("+2", "6"). */
 function drawValSquare(ctx, kx, ky, text) {
-  ctx.drawRect(kx, ky, KW, KW, 1);
+  ctx.drawRect(kx, ky, KW, KH, 1);
   const w = pf3Width(text);
-  pf3Print(ctx, kx + 1 + Math.floor((KW - 2 - w) / 2), ky + 1 + Math.floor((KW - 2 - 5) / 2), text, 1);
+  pf3Print(ctx, kx + 1 + Math.floor((KW - 2 - w) / 2), ky + 1 + Math.floor((KH - 2 - 5) / 2), text, 1);
 }
 
 function normOf(ctx, cell) {
@@ -583,7 +583,7 @@ function dottedV(ctx, x, y0, y1) {
 function drawEnvelopeRow(ctx, rowY, cells) {
   const nrm = (i) => (cells[i] ? normOf(ctx, cells[i]) : 0);
   const a = nrm(0), d = nrm(1), s = nrm(2), r = nrm(3);
-  const baseY = rowY + 14, topY = rowY + 1;
+  const baseY = rowY + KH - 2, topY = rowY + 1;
   const usableH = baseY - topY;
   const gateX = 88;
   const startX = 2;
