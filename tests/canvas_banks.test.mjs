@@ -12,7 +12,7 @@ const T = globalThis.bank_editor._test;
 const BANKS = T.BANKS;
 
 // The authoritative editable-param set = union of all ui_hierarchy level "params"
-// in obxd_plugin.cpp (preset/bank_index are not knob params, excluded). 76 keys.
+// in obxd_plugin.cpp (preset/bank_index are not knob params, excluded). 69 keys.
 const EXPECTED = [
   "osc1_saw","osc1_pulse","osc1_pitch","osc1_mix",
   "osc2_saw","osc2_pulse","osc2_pitch","osc2_mix","osc2_detune","osc2_sync","osc_quantize",
@@ -25,8 +25,7 @@ const EXPECTED = [
   "env_pitch","env_pitch_both","bend_range","bend_osc2","vibrato",
   "volume","tune","octave","octave_transpose","portamento",
   "voice_count","legato","unison","unison_det","as_played",
-  "filter_var","porta_var","env_var","level_var",
-  "pan_1","pan_2","pan_3","pan_4","pan_5","pan_6","pan_7","pan_8"
+  "filter_var","porta_var","env_var","level_var","spread"
 ];
 
 const KINDS = new Set(["unipolar", "bipolar", "enum", "octave", "count", "fader"]);

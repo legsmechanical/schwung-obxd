@@ -94,8 +94,8 @@
         },
         "voice_var": {
           "name": "Voice Variation",
-          "knobs": ["filter_var", "porta_var", "env_var", "level_var", "pan_1", "pan_2", "pan_3", "pan_4"],
-          "params": ["filter_var", "porta_var", "env_var", "level_var", "pan_1", "pan_2", "pan_3", "pan_4", "pan_5", "pan_6", "pan_7", "pan_8"]
+          "knobs": ["filter_var", "porta_var", "env_var", "level_var", "spread"],
+          "params": ["filter_var", "porta_var", "env_var", "level_var", "spread"]
         },
         "banks": {
           "name": "Banks",

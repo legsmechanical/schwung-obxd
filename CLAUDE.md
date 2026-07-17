@@ -55,7 +55,7 @@ Implements Move Anything plugin_api_v2 (multi-instance):
 - `get_param`: preset_name, preset_count, ui_hierarchy, chain_params, parameter values
 - `render_block`: Renders synth output
 
-### Parameters (74 total)
+### Parameters (67 total)
 
 **Economy mode** is intentionally NOT exposed in this fork: it is forced ON
 permanently (`procEconomyMode(1.0f)` in `v2_init_default_patch` and
@@ -102,10 +102,23 @@ Parameters are organized into categories for Shadow UI hierarchy navigation:
 - `env_pitch`, `env_pitch_both` (toggle), `bend_range` (toggle), `bend_osc2` (toggle), `vibrato`
 
 **Voice Variation** (per-voice analog drift)
-- `filter_var`, `porta_var`, `env_var`, `level_var`, `pan_1` … `pan_8` (pan: 0=L, 0.5=center, 1=R)
+- `filter_var`, `porta_var`, `env_var`, `level_var`, `spread`
 
 **Other**
 - `octave_transpose` (plugin-level, -3 to +3 octaves)
+
+### Voice spread (replaces per-voice pan params)
+
+Per-voice pans (`PAN1`..`PAN8`) are no longer individual params; a single
+plugin-level `spread` (0..100, like `octave_transpose` it lives outside
+`g_shadow_params`) derives all 8 pans in `obxd_apply_spread()`: voice pairs
+(1,2)(3,4)(5,6)(7,8) fan out progressively — odd voices left, even voices
+right, outer pairs wider (spread=100 puts voices 7/8 hard L/R). `spread` is a
+**latent override**: it starts at the sentinel `-1` (untouched), so preset
+`.fxb` pans stay in effect until the knob is first turned, after which spread
+owns the pans (0 = recenter all voices) including across preset changes. It is
+saved/restored in state (`-1`/absent = untouched); `pan_1`..`pan_8` keys in
+legacy state blobs are ignored.
 
 ### Parameter value model (native integers — Dexed/JV-880 pattern)
 

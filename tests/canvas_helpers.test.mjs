@@ -49,7 +49,7 @@ eq(T.accumStep(1, -1, 2), { accum: -1, fire: false }, "accum reversal resets the
   };
   be.onOpen(ctx);
   const turn = (cc, d2) => be.onMidi(ctx, { data: [0xB0, cc, d2] });
-  const legato = T.BANKS[12].knobs.find((c) => c.key === "legato");
+  const legato = T.BANKS[11].knobs.find((c) => c.key === "legato");
   eq(legato.sens, 3, "enum sens is 3 (slower than continuous 2)");
   store.legato = 0;
   turn(77, 1); turn(77, 1);
@@ -120,14 +120,14 @@ function cellByKey(key) {
   return null;
 }
 {
-  const ctx = stubCtx({ cutoff: 70, pan_1: 80, pan_2: 20, tune: 50, octave: -2, octave_transpose: 2, voice_count: 6, legato: 1, unison: 0 });
+  const ctx = stubCtx({ cutoff: 70, tune: 50, octave: -2, octave_transpose: 2, voice_count: 6, legato: 1, unison: 0 });
   const cut = T.formatCell(ctx, cellByKey("cutoff"));
   eq(cut.text, "70", "formatCell unipolar text");
   eq(cut.bar, 0.7, "formatCell unipolar bar frac");
-  const p1 = T.formatCell(ctx, cellByKey("pan_1"));
+  const p1 = T.formatCell(stubCtx({ tune: 80 }), cellByKey("tune"));
   eq(p1.text, "+30", "formatCell bipolar + text");
   eq(p1.centerBar, 0.6, "formatCell bipolar + centerBar");
-  const p2 = T.formatCell(ctx, cellByKey("pan_2"));
+  const p2 = T.formatCell(stubCtx({ tune: 20 }), cellByKey("tune"));
   eq(p2.text, "-30", "formatCell bipolar - text");
   const tune = T.formatCell(ctx, cellByKey("tune"));
   eq(tune.text, "0", "formatCell bipolar center text");

@@ -14,7 +14,7 @@ const kLegatoLabels = ["Rtrg", "Leg1", "Leg2", "Keep"];
 const CONFIG = {
   name: "OB-Xd",
 
-  /* All 76 editable params exactly once (test-asserted). Cell labels are
+  /* All 69 editable params exactly once (test-asserted). Cell labels are
    * deliberate <=4-char abbreviations (a 32px label cell fits 4 glyphs of
    * the 6px-advance pixel font). */
   banks: [
@@ -28,8 +28,7 @@ const CONFIG = {
     { label: "LFO", knobs: [uni("lfo_rate", "Rate"), uni("lfo_amt1", "Amt1"), uni("lfo_amt2", "Amt2"), tog("lfo_sin", "Sin"), tog("lfo_square", "Sqr"), tog("lfo_sh", "S/H"), tog("lfo_sync", "Sync")] },
     { label: "LFO Dest", knobs: [tog("lfo_osc1", "Osc1"), tog("lfo_osc2", "Osc2"), tog("lfo_filter", "Filt"), tog("lfo_pw1", "PW1"), tog("lfo_pw2", "PW2")] },
     { label: "Pitch Mod", knobs: [uni("env_pitch", "Env"), tog("env_pitch_both", "Both"), tog("bend_range", "Bend"), tog("bend_osc2", ">Os2"), uni("vibrato", "Vib")] },
-    { label: "Voice", knobs: [tog("unison", "Uni"), uni("unison_det", "Detn"), uni("filter_var", "Filt"), uni("porta_var", "Prta"), uni("env_var", "Env"), uni("level_var", "Lvl")] },
-    { label: "Pan", knobs: [bip("pan_1", "V1"), bip("pan_2", "V2"), bip("pan_3", "V3"), bip("pan_4", "V4"), bip("pan_5", "V5"), bip("pan_6", "V6"), bip("pan_7", "V7"), bip("pan_8", "V8")] },
+    { label: "Voice", knobs: [tog("unison", "Uni"), uni("unison_det", "Detn"), uni("filter_var", "Filt"), uni("porta_var", "Prta"), uni("env_var", "Env"), uni("level_var", "Lvl"), uni("spread", "Sprd")] },
     { label: "Global", knobs: [uni("volume", "Vol"), bip("tune", "Tune"), oct("octave", "Oct", -2, 2), oct("octave_transpose", "Trsp", -3, 3), uni("portamento", "Port"), count("voice_count", "Vcs", 1, 8), enumc("legato", "Lgto", kLegatoLabels, ["RTG", "LG1", "LG2", "KEP"]), tog("as_played", "Play")] }
   ],
 
@@ -46,12 +45,11 @@ const CONFIG = {
     { name: "LFO", bank: 7 },
     { name: "PITCH MOD", bank: 9 },
     { name: "VOICE", bank: 10 },
-    { name: "PAN", bank: 11 },
-    { name: "GLOBAL", bank: 12 }
+    { name: "GLOBAL", bank: 11 }
   ],
 
   /* Per-bank icons, shown on the picker rows. */
-  icons: ["sawpulse", "sawpulse", "pulse", "lp", "lp", "envf", "enva", "sine", "routes", "bend", "random", "pan", "global"],
+  icons: ["sawpulse", "sawpulse", "pulse", "lp", "lp", "envf", "enva", "sine", "routes", "bend", "random", "global"],
 
   /* Default native-int values (v2_init_default_patch, display units) — only
    * consumed off-device (previewer/tests); on device every read is live. */
@@ -71,8 +69,7 @@ const CONFIG = {
     lfo_osc1: 0, lfo_osc2: 0, lfo_filter: 0, lfo_pw1: 0, lfo_pw2: 0,
     env_pitch: 0, env_pitch_both: 0, bend_range: 0, bend_osc2: 0, vibrato: 0,
     filter_var: 0, porta_var: 0, env_var: 0, level_var: 0,
-    pan_1: 50, pan_2: 50, pan_3: 50, pan_4: 50,
-    pan_5: 50, pan_6: 50, pan_7: 50, pan_8: 50
+    spread: 0
   },
 
   testExports: { kLegatoLabels }

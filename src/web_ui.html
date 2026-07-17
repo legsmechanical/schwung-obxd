@@ -138,7 +138,6 @@
     box-shadow: inset 0 1px 4px rgba(0,0,0,0.7); text-shadow: 0 0 4px rgba(111,227,154,0.5);
   }
 
-  .vv-voices { display: flex; gap: 5px; justify-content: center; }
   .vv-num { font-size: 8px; color: var(--text-dim); text-align: center; }
   .disabled { opacity: .35; pointer-events: none; }
   .hint { color: var(--text-dim); font-size: 11px; margin: 8px 4px 2px; min-width: 980px; }
@@ -321,8 +320,8 @@ var PANELS = [
         { type: "knob", key: "porta_var", cap: "GLIDE", def: 0, small: true },
         { type: "knob", key: "env_var", cap: "ENV", def: 0, small: true },
         { type: "knob", key: "level_var", cap: "LEVEL", def: 0, small: true },
+        { type: "knob", key: "spread", cap: "SPREAD", def: 0, small: true },
       ]},
-      { type: "voices" },  /* pan_1..pan_8 */
     ]},
   ]},
 ];
@@ -468,30 +467,11 @@ function makeStepper(item) {
   return wrap;
 }
 
-/* ---------------- per-voice pan row ---------------- */
-function makeVoices() {
-  var box = document.createElement("div");
-  box.style.cssText = "display:flex;flex-direction:column;gap:4px;align-items:center;margin-top:4px;";
-  var hdr = document.createElement("div");
-  hdr.className = "hdr"; hdr.textContent = "VOICE PAN  1 - 8";
-  var row = document.createElement("div"); row.className = "vv-voices";
-  for (var i = 1; i <= 8; i++) {
-    var item = { type: "knob", key: "pan_" + i, cap: String(i), def: 0.5, small: true, bipolar: true };
-    var w = makeKnob(item);
-    /* compact captions to just the number */
-    w.querySelector(".cap").style.minWidth = "20px";
-    row.appendChild(w);
-  }
-  box.appendChild(hdr); box.appendChild(row);
-  return box;
-}
-
 /* ---------------- build a control element ---------------- */
 function build(item) {
   if (item.type === "knob") return makeKnob(item);
   if (item.type === "switch") return makeSwitch(item);
   if (item.type === "stepper") return makeStepper(item);
-  if (item.type === "voices") return makeVoices();
   if (item.type === "row") {
     var r = document.createElement("div");
     r.className = "row";

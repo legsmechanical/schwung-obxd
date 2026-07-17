@@ -197,15 +197,8 @@ static const param_def_t g_shadow_params[] = {
     {"env_var",       "Env Var",       PARAM_TYPE_FLOAT, ENVDER,        0.0f, 1.0f},
     {"level_var",     "Level Var",     PARAM_TYPE_FLOAT, LEVEL_DIF,     0.0f, 1.0f},
 
-    /* Per-voice Pan - continuous (0=left, 0.5=center, 1=right) */
-    {"pan_1",         "Pan 1",         PARAM_TYPE_FLOAT, PAN1,          0.0f, 1.0f},
-    {"pan_2",         "Pan 2",         PARAM_TYPE_FLOAT, PAN2,          0.0f, 1.0f},
-    {"pan_3",         "Pan 3",         PARAM_TYPE_FLOAT, PAN3,          0.0f, 1.0f},
-    {"pan_4",         "Pan 4",         PARAM_TYPE_FLOAT, PAN4,          0.0f, 1.0f},
-    {"pan_5",         "Pan 5",         PARAM_TYPE_FLOAT, PAN5,          0.0f, 1.0f},
-    {"pan_6",         "Pan 6",         PARAM_TYPE_FLOAT, PAN6,          0.0f, 1.0f},
-    {"pan_7",         "Pan 7",         PARAM_TYPE_FLOAT, PAN7,          0.0f, 1.0f},
-    {"pan_8",         "Pan 8",         PARAM_TYPE_FLOAT, PAN8,          0.0f, 1.0f},
+    /* Per-voice pan (PAN1..PAN8) is not exposed directly — a single plugin-level
+     * "spread" param (see obxd_apply_spread) derives all 8 pans. */
 };
 
 /* =====================================================================
@@ -317,6 +310,7 @@ typedef struct {
     int preset_count;
     int param_bank;
     int octave_transpose;
+    int spread;       /* 0..100 stereo voice spread; -1 = untouched (preset .fxb pans stay in effect) */
     float tempo_bpm;
     char preset_name[64];
     float params[PARAM_COUNT];  /* Engine param storage - indexed by ParamsEnum */
@@ -338,6 +332,24 @@ static void v2_scan_banks(obxd_instance_t *inst, const char *module_dir);
 static int v2_switch_bank(obxd_instance_t *inst, int bank_idx);
 
 /* v2 helper: Initialize default patch */
+/* Derive all 8 per-voice pans from the single "spread" param (0..100).
+ * Voice pairs (1,2)(3,4)(5,6)(7,8) fan out progressively: odd voices left,
+ * even voices right, outer pairs wider. At spread=100 voices 7/8 are hard L/R.
+ * spread == -1 means the user never touched it: preset .fxb pans stay in
+ * effect and this is a no-op. First turn of the knob takes ownership (so
+ * spread 0 recenters every voice). */
+static void obxd_apply_spread(obxd_instance_t *inst) {
+    if (inst->spread < 0) return;
+    float s = inst->spread / 100.0f;
+    for (int v = 0; v < 8; v++) {
+        float width = (v / 2 + 1) / 4.0f;                 /* pair 1..4 -> 0.25..1 */
+        float dir = (v % 2 == 0) ? -1.0f : 1.0f;          /* voice 1,3,5,7 left */
+        float pan = 0.5f + dir * 0.5f * s * width;
+        inst->synth->processPan(pan, v + 1);
+        inst->params[PAN1 + v] = pan;
+    }
+}
+
 static void v2_init_default_patch(obxd_instance_t *inst) {
     SynthEngine *synth = inst->synth;
 
@@ -406,7 +418,9 @@ static void v2_init_default_patch(obxd_instance_t *inst) {
     synth->processFilterEnvelopeRelease(0.2f);
     inst->params[FREL] = 0.2f;
 
-    /* Per-voice pan: center all voices by default */
+    /* Per-voice pan: center all voices; spread starts untouched so preset
+     * .fxb pans apply until the user first turns the knob */
+    inst->spread = -1;
     for (int v = 0; v < 8; v++) {
         synth->processPan(0.5f, v + 1);
         inst->params[PAN1 + v] = 0.5f;
@@ -518,10 +532,15 @@ static void v2_apply_preset(obxd_instance_t *inst, int preset_idx) {
     synth->procEconomyMode(1.0f);  /* economy mode is always on in this fork — ignore preset value */
     if (p->param_count > LEVEL_DIF) synth->processLoudnessDetune(p->params[LEVEL_DIF]);
 
-    /* Per-voice pan (engine idx is 1-based) */
+    /* Per-voice pan: preset .fxb pans apply unless the user has taken over
+     * with the spread knob, which then re-asserts itself */
     for (int v = 0; v < 8; v++) {
-        if (p->param_count > PAN1 + v) synth->processPan(p->params[PAN1 + v], v + 1);
+        if (p->param_count > PAN1 + v) {
+            synth->processPan(p->params[PAN1 + v], v + 1);
+            inst->params[PAN1 + v] = p->params[PAN1 + v];
+        }
     }
+    obxd_apply_spread(inst);
 }
 
 /* v2 helper: Apply parameter */
@@ -1037,6 +1056,14 @@ static void v2_set_param(void *instance, const char *key, const char *val) {
             if (inst->octave_transpose > 3) inst->octave_transpose = 3;
         }
 
+        /* Restore voice spread. -1 (or absent) = untouched -> preset pans stay.
+         * pan_1..pan_8 keys in legacy blobs are ignored (no longer in the table). */
+        if (json_get_number(val, "spread", &fval) == 0 && fval >= 0.0f) {
+            inst->spread = (int)fval;
+            if (inst->spread > 100) inst->spread = 100;
+            obxd_apply_spread(inst);
+        }
+
         /* Restore all shadow params.
          *
          * State version sentinel "_sv": v2 (current) stores each param as a native
@@ -1097,6 +1124,12 @@ static void v2_set_param(void *instance, const char *key, const char *val) {
         inst->octave_transpose = atoi(val);
         if (inst->octave_transpose < -3) inst->octave_transpose = -3;
         if (inst->octave_transpose > 3) inst->octave_transpose = 3;
+    }
+    else if (strcmp(key, "spread") == 0) {
+        inst->spread = atoi(val);
+        if (inst->spread < 0) inst->spread = 0;
+        if (inst->spread > 100) inst->spread = 100;
+        obxd_apply_spread(inst);
     }
     else if (strcmp(key, "param_bank") == 0) {
         inst->param_bank = atoi(val);
@@ -1181,6 +1214,11 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
     }
     if (strcmp(key, "octave_transpose") == 0) {
         return snprintf(buf, buf_len, "%d", inst->octave_transpose);
+    }
+
+    if (strcmp(key, "spread") == 0) {
+        /* untouched (-1) displays as 0 — first edit takes ownership of the pans */
+        return snprintf(buf, buf_len, "%d", inst->spread < 0 ? 0 : inst->spread);
     }
     if (strcmp(key, "param_bank") == 0) {
         return snprintf(buf, buf_len, "%d", inst->param_bank);
@@ -1287,8 +1325,8 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
                 "},"
                 "\"voice_var\":{"
                     "\"children\":null,"
-                    "\"knobs\":[\"filter_var\",\"porta_var\",\"env_var\",\"level_var\",\"pan_1\",\"pan_2\",\"pan_3\",\"pan_4\"],"
-                    "\"params\":[\"filter_var\",\"porta_var\",\"env_var\",\"level_var\",\"pan_1\",\"pan_2\",\"pan_3\",\"pan_4\",\"pan_5\",\"pan_6\",\"pan_7\",\"pan_8\"]"
+                    "\"knobs\":[\"filter_var\",\"porta_var\",\"env_var\",\"level_var\",\"spread\"],"
+                    "\"params\":[\"filter_var\",\"porta_var\",\"env_var\",\"level_var\",\"spread\"]"
                 "},"
                 "\"banks\":{"
                     "\"name\":\"Banks\","
@@ -1315,8 +1353,8 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
         /* "_sv" (state version) MUST be emitted first. Restore uses its presence to
          * distinguish v2 native-int blobs from legacy v1 engine-normalized-float blobs. */
         offset += snprintf(buf + offset, buf_len - offset,
-            "{\"_sv\":2,\"preset\":%d,\"octave_transpose\":%d,\"bank_index\":%d,\"bank_name\":\"%s\"",
-            inst->current_preset, inst->octave_transpose, inst->current_bank, bname);
+            "{\"_sv\":2,\"preset\":%d,\"octave_transpose\":%d,\"spread\":%d,\"bank_index\":%d,\"bank_name\":\"%s\"",
+            inst->current_preset, inst->octave_transpose, inst->spread, inst->current_bank, bname);
 
         /* Add all shadow params as native ints (consistent with get_param/chain_params).
          * The remote-UI bulk path reads "state" and forwards these values verbatim to
@@ -1339,6 +1377,7 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
         offset += snprintf(buf + offset, buf_len - offset,
             "[{\"key\":\"preset\",\"name\":\"Preset\",\"type\":\"int\",\"min\":0,\"max\":9999},"
             "{\"key\":\"octave_transpose\",\"name\":\"Octave\",\"type\":\"int\",\"min\":-3,\"max\":3},"
+            "{\"key\":\"spread\",\"name\":\"Spread\",\"type\":\"int\",\"min\":0,\"max\":100,\"step\":1},"
             "{\"key\":\"editor\",\"name\":\"Bank Editor\",\"type\":\"canvas\","
             "\"canvas_script\":\"canvas.js#bank_editor\",\"show_footer\":false,\"show_value\":false}");
 

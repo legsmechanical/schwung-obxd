@@ -46,8 +46,8 @@ const SCALE = 3, GAP = 6;
 const frames = [];
 for (let b = 0; b < T.BANKS.length; b++) frames.push({ fb: renderBank(b), name: T.BANKS[b].label });
 frames.push({ fb: renderBank(6, { lastKnob: 1 }), name: "Amp Env (Decay touched)" });
-frames.push({ fb: renderBank(11, { lastKnob: 2, init: { pan_3: 80 } }), name: "Pan (V3 touched, panned R)" });
-frames.push({ fb: renderBank(12, { lastKnob: 6, init: { legato: 2 } }), name: "Global (Legato touched -> enum overlay)" });
+frames.push({ fb: renderBank(10, { lastKnob: 6, init: { spread: 80 } }), name: "Voice (Spread touched)" });
+frames.push({ fb: renderBank(11, { lastKnob: 6, init: { legato: 2 } }), name: "Global (Legato touched -> enum overlay)" });
 frames.push({ fb: renderBank(0, { shift: true }), name: "SHIFT section navigator (overlay)" });
 
 const rows = frames.length;
