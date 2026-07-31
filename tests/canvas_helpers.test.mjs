@@ -10,6 +10,7 @@ const src = readFileSync(join(here, "..", "src", "canvas.js"), "utf8");
 const T = globalThis.bank_editor._test;
 
 let failures = 0;
+function ok(cond, msg) { eq(!!cond, true, msg); }
 function eq(actual, expected, msg) {
   const a = JSON.stringify(actual), e = JSON.stringify(expected);
   if (a !== e) { failures++; console.error(`FAIL ${msg}: got ${a}, want ${e}`); }
@@ -50,12 +51,19 @@ eq(T.accumStep(1, -1, 2), { accum: -1, fire: false }, "accum reversal resets the
   be.onOpen(ctx);
   const turn = (cc, d2) => be.onMidi(ctx, { data: [0xB0, cc, d2] });
   const legato = T.BANKS[11].knobs.find((c) => c.key === "legato");
-  eq(legato.sens, 3, "enum sens is 3 (slower than continuous 2)");
+  /* Assert the RELATIONSHIP, not the number. The number is the KIT's to choose
+   * (KIT_PICK_SENS) and it has already moved once — 3 at v30, 6 at v39. Pinning
+   * it here made a module test fail on a framework tune, and briefly argued for
+   * freezing obxd on the old value, which is backwards: the point of the kit is
+   * that its modules share one feel. obxd expresses no preference and should
+   * follow whatever the kit decides. */
+  const CONT = 2;                     // continuous cells (KIT_SENS)
+  ok(legato.sens > CONT, "pick-class steps SLOWER than continuous (" + legato.sens + " > " + CONT + ")");
   store.legato = 0;
-  turn(77, 1); turn(77, 1);
-  eq(store.legato, 0, "enum: 2 detents don't fire at sens 3");
+  for (let i = 0; i < legato.sens - 1; i++) turn(77, 1);
+  eq(store.legato, 0, "pick: sens-1 detents do not fire");
   turn(77, 1);
-  eq(store.legato, 1, "enum: 3rd detent fires");
+  eq(store.legato, 1, "pick: the sens'th detent fires");
   store.legato = 3;
   turn(77, 1); turn(77, 1); turn(77, 1);
   eq(store.legato, 3, "enum clamps at max (no wrap to 0)");
