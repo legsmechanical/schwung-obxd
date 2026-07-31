@@ -6,6 +6,13 @@
 
 /* Native continuous params are 0..100 (the module's chain contract). */
 KIT_PARAM_MAX = 100;
+/* v30 stepped every PICK-class cell at 3 — enums via KIT_ENUM_SENS, oct() and
+ * count() hardcoded. v39 folds all three into KIT_PICK_SENS, whose default is
+ * 6, so regenerating without this would silently DOUBLE the travel on every
+ * enum, octave and count knob. Pinned so the regeneration changes no feel;
+ * re-tuning is a separate, deliberate call. (obxd's own
+ * tests/canvas_helpers.test.mjs asserts the 3-detent step and catches this.) */
+KIT_PICK_SENS = 3;
 
 /* Legato mode order matches the engine (LEGATOMODE 0-3) and the remote UI.
  * Kept to 4 chars so values never get fitText-trimmed in a label cell. */
