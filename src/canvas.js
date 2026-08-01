@@ -2952,5 +2952,16 @@ const bank_editor = {
 };
 
 
+/* Provenance, stamped at RUNTIME — not just in the banner comment above.
+ *
+ * A host that only wants to run kit-generated canvases (davebox does, because it
+ * is selling one consistent UI across modules) needs a stable way to ask. Until
+ * this existed the only signal was bank_editor._test, which is the kit's
+ * INTERNAL test surface: renaming it at any version would have silently switched
+ * hosting off, with the module falling back to adoption and nobody told.
+ *
+ * A version rather than a boolean, so a host can also set a floor if the ctx
+ * contract ever changes — refusing an old canvas beats rendering it wrong. */
+bank_editor.kitVersion = 39;
 globalThis.bank_editor = bank_editor;
 })();
