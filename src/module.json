@@ -35,14 +35,6 @@
           ],
           "params": [
             {
-              "level": "banks",
-              "label": "Banks"
-            },
-            {
-              "level": "presets",
-              "label": "Presets"
-            },
-            {
               "level": "global",
               "label": "Global"
             },
@@ -85,6 +77,14 @@
             {
               "level": "voice_var",
               "label": "Voice Variation"
+            },
+            {
+              "level": "banks",
+              "label": "Banks"
+            },
+            {
+              "level": "presets",
+              "label": "Presets"
             }
           ]
         },

@@ -173,6 +173,42 @@ const EXPECTED = [
   adsr("filt_env", ["f_attack", "f_decay", "f_sustain", "f_release"]);
 }
 
+/* ============================================================== 5 ==
+ * SOUND-CHOOSING SITS AT THE END, TOGETHER, AND IN THAT ORDER.
+ *
+ * The host appends its own trailing pages — My Presets, Module — AFTER the whole
+ * level walk, so last in root`s params puts Banks and Presets immediately ahead
+ * of them: the synth`s parameters first, everything about picking a sound at the
+ * tail. Banks precedes Presets because the bank scopes which presets exist, and
+ * `banks` navigates INTO `presets` rather than back to the top.
+ *
+ * Pinned because both ways this drifts read as fine in a diff: the two links
+ * coming apart, or creeping back up the list as pages are added.
+ * scripts/check-bank-order.mjs applies the same rule across every module.
+ */
+{
+  const links = (levels.root.params || [])
+    .filter((p) => p && typeof p === "object" && p.level)
+    .map((p) => p.level);
+
+  ok(!levels.root.list_param,
+     "the preset browser is NOT on root — a level`s own browser is emitted "
+     + "before its children, which would put presets ahead of banks");
+
+  const b = links.indexOf("banks"), p = links.indexOf("presets");
+  ok(b >= 0 && p >= 0, "root links both banks and presets");
+  ok(p === b + 1, `presets follows banks directly, got ${b} and ${p}`);
+  ok(p === links.length - 1,
+     "and they are the LAST pages before the host`s My Presets, got "
+     + JSON.stringify(links.slice(-3)));
+
+  ok((levels.banks || {}).navigate_to === "presets",
+     "choosing a bank lands in ITS presets, got "
+     + JSON.stringify((levels.banks || {}).navigate_to));
+  ok(!!(levels.presets || {}).list_param,
+     "and the presets level is the one carrying the browser");
+}
+
 console.log(failures === 0
   ? `\nALL HIERARCHY CHECKS PASSED (${Object.keys(levels).length} levels, ${EXPECTED.length} params)`
   : `\n${failures} FAILED`);

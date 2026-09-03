@@ -1259,8 +1259,6 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
                     "\"children\":null,"
                     "\"knobs\":[\"cutoff\",\"resonance\",\"filter_env\",\"attack\",\"decay\",\"sustain\",\"release\",\"octave_transpose\"],"
                     "\"params\":["
-                        "{\"level\":\"banks\",\"label\":\"Banks\"},"
-                        "{\"level\":\"presets\",\"label\":\"Presets\"},"
                         "{\"level\":\"global\",\"label\":\"Global\"},"
                         "{\"level\":\"osc1\",\"label\":\"Oscillator 1\"},"
                         "{\"level\":\"osc2\",\"label\":\"Oscillator 2\"},"
@@ -1271,7 +1269,16 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
                         "{\"level\":\"lfo\",\"label\":\"LFO\"},"
                         "{\"level\":\"lfo_dest\",\"label\":\"LFO Dest\"},"
                         "{\"level\":\"pitch_mod\",\"label\":\"Pitch Mod\"},"
-                        "{\"level\":\"voice_var\",\"label\":\"Voice Variation\"}"
+                        "{\"level\":\"voice_var\",\"label\":\"Voice Variation\"},"
+                        /* ⭑ SOUND-CHOOSING LIVES AT THE END, together.
+                         * The planner appends the host's own trailing pages
+                         * (My Presets, Module) AFTER the whole walk, so last in
+                         * root's params puts these immediately ahead of them:
+                         * the synth's parameters come first, and everything to
+                         * do with picking a sound clusters at the tail. Banks
+                         * before Presets because the bank scopes the list. */
+                        "{\"level\":\"banks\",\"label\":\"Banks\"},"
+                        "{\"level\":\"presets\",\"label\":\"Presets\"}"
                     "]"
                 "},"
                 "\"global\":{"
