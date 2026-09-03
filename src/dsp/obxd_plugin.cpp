@@ -1251,14 +1251,16 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
         const char *hierarchy = "{"
             "\"modes\":null,"
             "\"levels\":{"
+                /* ⭑ THE BROWSER IS NOT ON ROOT — see the `presets` level below.
+                 * A level's own preset page is emitted BEFORE its children, so a
+                 * browser here would always put presets ahead of the bank that
+                 * scopes them. Checked by scripts/check-bank-order.mjs. */
                 "\"root\":{"
-                    "\"list_param\":\"preset\","
-                    "\"count_param\":\"preset_count\","
-                    "\"name_param\":\"preset_name\","
                     "\"children\":null,"
                     "\"knobs\":[\"cutoff\",\"resonance\",\"filter_env\",\"attack\",\"decay\",\"sustain\",\"release\",\"octave_transpose\"],"
                     "\"params\":["
                         "{\"level\":\"banks\",\"label\":\"Banks\"},"
+                        "{\"level\":\"presets\",\"label\":\"Presets\"},"
                         "{\"level\":\"global\",\"label\":\"Global\"},"
                         "{\"level\":\"osc1\",\"label\":\"Oscillator 1\"},"
                         "{\"level\":\"osc2\",\"label\":\"Oscillator 2\"},"
@@ -1332,7 +1334,21 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
                     "\"label\":\"Select Bank\","
                     "\"items_param\":\"fxb_bank_list\","
                     "\"select_param\":\"bank_index\","
-                    "\"navigate_to\":\"root\""
+                    /* Choosing a bank lands you in ITS presets, not back at the
+                     * top: the bank was only ever chosen in order to pick from
+                     * it. This used to return to root because root WAS the
+                     * browser. */
+                    "\"navigate_to\":\"presets\""
+                "},"
+                /* The preset browser, moved off root so it sits AFTER the bank
+                 * that scopes it. Same three fields, same params — only the
+                 * level they live on changed. */
+                "\"presets\":{"
+                    "\"name\":\"Presets\","
+                    "\"label\":\"Preset\","
+                    "\"list_param\":\"preset\","
+                    "\"count_param\":\"preset_count\","
+                    "\"name_param\":\"preset_name\""
                 "}"
             "}"
         "}";
