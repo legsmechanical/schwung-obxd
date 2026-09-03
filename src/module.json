@@ -16,7 +16,6 @@
     "midi_out": false,
     "aftertouch": true,
     "chainable": true,
-    "host_canvas_ui": true,
     "component_type": "sound_generator",
     "ui_hierarchy": {
       "modes": null,

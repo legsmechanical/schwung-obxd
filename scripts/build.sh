@@ -61,7 +61,10 @@ cat src/module.json > dist/obxd/module.json
 [ -f src/help.json ] && cat src/help.json > dist/obxd/help.json
 [ -f src/web_ui.html ] && cat src/web_ui.html > dist/obxd/web_ui.html
 cat src/ui.js > dist/obxd/ui.js
-cat src/canvas.js > dist/obxd/canvas.js
+# ⛔ canvas.js is NOT packaged — the bank editor is suppressed and the host draws
+# its own generated knob grid. The source stays in the tree, unbuilt, so this
+# reverts by restoring this line and the two declarations in the wrapper.
+# cat src/canvas.js > dist/obxd/canvas.js
 cat build/dsp.so > dist/obxd/dsp.so
 chmod +x dist/obxd/dsp.so
 

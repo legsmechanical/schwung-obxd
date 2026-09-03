@@ -1258,7 +1258,6 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
                     "\"children\":null,"
                     "\"knobs\":[\"cutoff\",\"resonance\",\"filter_env\",\"attack\",\"decay\",\"sustain\",\"release\",\"octave_transpose\"],"
                     "\"params\":["
-                        "{\"key\":\"editor\",\"label\":\"Bank Editor\"},"
                         "{\"level\":\"banks\",\"label\":\"Banks\"},"
                         "{\"level\":\"global\",\"label\":\"Global\"},"
                         "{\"level\":\"osc1\",\"label\":\"Oscillator 1\"},"
@@ -1377,9 +1376,21 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
         offset += snprintf(buf + offset, buf_len - offset,
             "[{\"key\":\"preset\",\"name\":\"Preset\",\"type\":\"int\",\"min\":0,\"max\":9999},"
             "{\"key\":\"octave_transpose\",\"name\":\"Octave\",\"type\":\"int\",\"min\":-3,\"max\":3},"
-            "{\"key\":\"spread\",\"name\":\"Spread\",\"type\":\"int\",\"min\":0,\"max\":100,\"step\":1},"
-            "{\"key\":\"editor\",\"name\":\"Bank Editor\",\"type\":\"canvas\","
-            "\"canvas_script\":\"canvas.js#bank_editor\",\"show_footer\":false,\"show_value\":false}");
+            "{\"key\":\"spread\",\"name\":\"Spread\",\"type\":\"int\",\"min\":0,\"max\":100,\"step\":1}");
+        /*
+         * ⛔ THE BANK EDITOR CANVAS IS SUPPRESSED — see the canvas-suppression arc.
+         *
+         * A `type:"canvas"` entry here is what claimed the screen; without it the
+         * host draws its own generated knob grid from the ui_hierarchy below,
+         * which already carries this module's banks in their editor order. The
+         * editor sources stay in the tree, unbuilt: this is a declaration
+         * change and it reverts by putting these lines back.
+         *
+         * The entry read:
+         *   {"key":"editor","name":"Bank Editor","type":"canvas",
+         *    "canvas_script":"canvas.js#bank_editor","show_footer":false,
+         *    "show_value":false}
+         */
 
         /* Add all shadow params — native int ranges (type int, step 1) */
         for (int i = 0; i < (int)PARAM_DEF_COUNT(g_shadow_params) && offset < buf_len - 100; i++) {
