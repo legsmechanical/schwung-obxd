@@ -105,17 +105,17 @@ const EXPECTED = [
      || moduleJson.capabilities.host_canvas_ui === undefined,
      "module.json declares no host_canvas_ui — this is the one dAVEBOx reads");
 
-  /* Two separate things, and the second is the one that bit (on rrverb10, the
-   * next module through): `dist/` is not cleaned between builds, so dropping the
-   * copy line alone leaves the PREVIOUS build's canvas.js sitting in the
-   * package — the artifact still ships the editor while every declaration says
-   * it is gone. */
+  /* Two separate things, and the second bit TWICE in one session. `dist/` is
+   * not cleaned by hand, so dropping the copy line alone leaves the PREVIOUS
+   * build's canvas.js sitting in the package — the artifact still ships the
+   * editor while every declaration says it is gone. (The same trap then shipped
+   * a stale help.json.) So the build must WIPE dist, not remove one file. */
   const copies = buildSh.split("\n").filter(
     (l) => /canvas\.js/.test(l) && !/^\s*#/.test(l) && !/^\s*rm\s/.test(l));
   ok(copies.length === 0,
      "build.sh copies no canvas.js into dist, got " + JSON.stringify(copies));
-  ok(/^\s*rm -f [^\n]*dist[^\n]*canvas\.js/m.test(buildSh),
-     "and REMOVES a stale one left in dist by an earlier build");
+  ok(/^\s*rm -rf ["']?dist/m.test(buildSh),
+     "and WIPES dist before packaging, so nothing from an older build survives");
 
   /* And the INSTALLER only copies too, so a canvas.js from a pre-suppression
    * install survives on the device — where dAVEBOx loads it off disk regardless

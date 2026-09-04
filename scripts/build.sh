@@ -45,6 +45,13 @@ echo "Cross prefix: $CROSS_PREFIX"
 
 # Create build directories
 mkdir -p build
+# ⭑ WIPE dist FIRST — every file below is regenerated from src, so anything
+# surviving here came from an OLDER build. Not hypothetical: suppressing the
+# canvas by dropping its packaging line left the previous build's canvas.js in
+# the tarball, and editing help.json without rebuilding shipped the stale copy —
+# twice in one session, both silent, both caught only by LISTING the artifact.
+# Removing a file from the build must remove it from the PACKAGE.
+rm -rf dist/obxd
 mkdir -p dist/obxd
 
 # Compile DSP plugin
@@ -64,7 +71,6 @@ cat src/ui.js > dist/obxd/ui.js
 # dist/ is not cleaned between builds, so simply not copying canvas.js leaves the
 # LAST build's copy sitting in the package -- observed doing exactly that. Remove
 # it explicitly, or the tarball still ships the editor dAVEBOx loads off disk.
-rm -f dist/obxd/canvas.js
 
 # ⛔ canvas.js is NOT packaged — the bank editor is suppressed and the host draws
 # its own generated knob grid. The source stays in the tree, unbuilt, so this
