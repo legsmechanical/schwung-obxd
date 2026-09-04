@@ -19,6 +19,12 @@ echo "Copying module to Move..."
 ssh ableton@move.local "mkdir -p /data/UserData/schwung/modules/sound_generators/obxd"
 scp -r dist/obxd/* ableton@move.local:/data/UserData/schwung/modules/sound_generators/obxd/
 
+# The installer only ever COPIES, so a canvas.js from a pre-suppression install
+# survives on the device forever -- and dAVEBOx loads that file straight off
+# disk whenever it is present, regardless of what module.json declares, which
+# silently restores the suppressed Bank Editor on a Move-bus slot.
+ssh ableton@move.local "rm -f /data/UserData/schwung/modules/sound_generators/obxd/canvas.js"
+
 # Install chain presets if they exist
 if [ -d "src/chain_patches" ]; then
     echo "Installing chain presets..."

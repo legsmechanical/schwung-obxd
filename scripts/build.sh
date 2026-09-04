@@ -61,6 +61,11 @@ cat src/module.json > dist/obxd/module.json
 [ -f src/help.json ] && cat src/help.json > dist/obxd/help.json
 [ -f src/web_ui.html ] && cat src/web_ui.html > dist/obxd/web_ui.html
 cat src/ui.js > dist/obxd/ui.js
+# dist/ is not cleaned between builds, so simply not copying canvas.js leaves the
+# LAST build's copy sitting in the package -- observed doing exactly that. Remove
+# it explicitly, or the tarball still ships the editor dAVEBOx loads off disk.
+rm -f dist/obxd/canvas.js
+
 # ⛔ canvas.js is NOT packaged — the bank editor is suppressed and the host draws
 # its own generated knob grid. The source stays in the tree, unbuilt, so this
 # reverts by restoring this line and the two declarations in the wrapper.
